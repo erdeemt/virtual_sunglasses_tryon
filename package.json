@@ -1,0 +1,25 @@
+{
+  "name": "gozluk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform-aware virtual try-on for eyewear (B2B SaaS core)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @vto/demo",
+    "build": "npm run build --workspace @vto/demo",
+    "typecheck": "tsc -p packages/core --noEmit && tsc -p packages/render --noEmit && tsc -p apps/demo --noEmit",
+    "setup": "node scripts/setup-assets.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/three": "^0.185.1",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.10"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

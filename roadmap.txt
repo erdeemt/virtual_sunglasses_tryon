@@ -1,0 +1,958 @@
+PERPLEXİTY
+
+olay şu: MediaPipe Face Mesh zaten cross-platform — iPhone 17, Android, PC webcam fark etmez, hepsinde tarayıcıda çalışır. Çünkü WebAssembly (WASM) + WebGL kullanıyor, native kod değil.
+
+Ama senin için dinamik device detection ekleyip, her cihazda en iyi performansı verecek şekilde roadmap'i güncelliyorum:
+
+🌍 Cross-Platform Gözlük Virtual Try-On — Dinamik Roadmap
+🎯 Hedef
+Tek kodbase ile şunları destekle:
+
+iPhone 17 (iOS Safari, ARKit desteği varsa)
+
+Android (Chrome, Samsung Internet, ARCore desteği varsa)
+
+PC/Mac (Webcam, Chrome/Firefox/Safari/Edge)
+
+Tablet (iPad, Android tablet)
+
+🧠 Dinamik Device Detection & Fallback Stratejisi
+javascript
+// 1. Device & Browser Tespiti
+function detectCapabilities() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid = /Android/.test(navigator.userAgent);
+  const isMobile = isIOS || isAndroid;
+  const hasWebGL = !!document.createElement('canvas').getContext('webgl');
+  const hasWebGPU = !!navigator.gpu; // Gelecek için
+  const hasARKit = isIOS && window.ARKit; // iOS 12+ (opsiyonel)
+  const hasARCore = isAndroid && navigator.xr; // WebXR desteği
+
+  return {
+    isIOS,
+    isAndroid,
+    isMobile,
+    hasWebGL,
+    hasWebGPU,
+    hasARKit,
+    hasARCore,
+    recommendedMode: (hasARKit || hasARCore) ? 'native-ar' : 'mediapipe-web'
+  };
+}
+Fallback Mantığı
+Cihaz	Önerilen Mod	Fallback
+iPhone X+ (iOS 14+)	ARKit + WebXR	MediaPipe Face Mesh
+Android (ARCore destekli)	ARCore + WebXR	MediaPipe Face Mesh
+Eski iPhone/Android	MediaPipe Face Mesh	2D overlay (statik)
+PC/Mac (Webcam)	MediaPipe Face Mesh	2D overlay (statik)
+🛠️ Güncellenmiş Teknik Stack
+Katman	Teknoloji	Alternatif
+Device Detection	navigator.userAgent + navigator.xr	Modernizr, Bowser
+Yüz Algılama	MediaPipe Face Mesh (WASM)	TensorFlow.js FaceMesh
+AR (Native)	WebXR + ARCore/ARKit (opsiyonel)	8th Wall (ticari)
+3D Render	Three.js + WebGL	Babylon.js
+Webcam	getUserMedia API	react-webcam
+Hosting	Vercel / Netlify / Cloudflare Pages	AWS S3 + CloudFront
+📱 Dinamik Pipeline
+text
+Kullanıcı girer
+    ↓
+Device Detection (iOS/Android/PC, AR desteği var mı?)
+    ↓
+[AR Destekli Cihaz] → WebXR + ARKit/ARCore (en gerçekçi)
+    ↓
+[AR Destek Yok] → MediaPipe Face Mesh + Three.js (standart)
+    ↓
+[WebGL Yok] → 2D Overlay (statik fallback)
+🚀 Güncellenmiş Geliştirme Adımları
+Adım 1: Device Detection Ekle
+javascript
+// utils/deviceDetector.js
+export function getDeviceProfile() {
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua);
+  const isAndroid = /Android/.test(ua);
+  const isMobile = isIOS || isAndroid;
+  
+  // WebXR desteği (ARCore/ARKit için)
+  const hasWebXR = !!navigator.xr;
+  
+  // WebGL desteği
+  const hasWebGL = !!document.createElement('canvas').getContext('webgl');
+  
+  // Önerilen mod
+  let mode = 'mediapipe'; // default
+  if (hasWebXR && isIOS) mode = 'arkit';
+  if (hasWebXR && isAndroid) mode = 'arcore';
+  if (!hasWebGL) mode = 'fallback-2d';
+  
+  return { isIOS, isAndroid, isMobile, hasWebXR, hasWebGL, mode };
+}
+Adım 2: Dinamik Yükleme
+javascript
+// main.js
+import { getDeviceProfile } from './utils/deviceDetector.js';
+
+const profile = getDeviceProfile();
+
+if (profile.mode === 'arkit' || profile.mode === 'arcore') {
+  // WebXR + Native AR yükle
+  import('./ar-webxr.js').then(module => module.init());
+} else if (profile.mode === 'mediapipe') {
+  // MediaPipe + Three.js yükle
+  import('./mediapipe-three.js').then(module => module.init());
+} else {
+  // Fallback: 2D overlay
+  import('./fallback-2d.js').then(module => module.init());
+}
+🎨 Performans Optimizasyonları (Cihaza Göre)
+Cihaz	Optimizasyon
+iPhone 17	ARKit + Metal GPU acceleration, 60 FPS
+Android (Snapdragon 8+)	ARCore + Vulkan, 60 FPS
+Eski Android	MediaPipe (CPU, 30 FPS)
+PC (Webcam)	MediaPipe (GPU, 60 FPS)
+Düşük RAM	Landmark sayısını 468 → 100'e düşür
+📦 Deployment & Test Stratejisi
+1. Çoklu Cihaz Testi
+iPhone 17 (iOS 19+, Safari)
+
+Samsung Galaxy S25 (Android 15, Chrome)
+
+Eski Android (Android 9, Chrome)
+
+MacBook Pro (macOS, Chrome/Safari)
+
+Windows PC (Windows 11, Chrome/Edge)
+
+2. CDN & Lazy Loading
+MediaPipe WASM dosyalarını CDN'den yükle (hızlı başlangıç).
+
+AR modülünü lazy load et (sadece AR destekli cihazlarda).
+
+3. HTTPS & Permissions
+Webcam için HTTPS zorunlu (localhost hariç).
+
+Kullanıcıya kamera izni açıklayan onboarding ekranı ekle.
+
+🧪 Örnek Proje Yapısı
+text
+virtual-tryon/
+├── index.html
+├── main.js
+├── utils/
+│   ├── deviceDetector.js
+│   └── landmarkCalculator.js
+├── modes/
+│   ├── ar-webxr.js      (ARKit/ARCore)
+│   ├── mediapipe-three.js (Standart)
+│   └── fallback-2d.js   (Eski cihazlar)
+├── models/
+│   ├── glasses-model-1.glb
+│   └── glasses-model-2.glb
+└── styles/
+    └── global.css
+✅ Sonuç
+Tek kodbase ile tüm cihazlarda çalışır.
+
+Dinamik detection ile her cihazda en iyi performansı verir.
+
+Fallback mekanizması ile eski cihazlarda da çalışır.
+
+MediaPipe zaten cross-platform, sen sadece mod seçimini dinamik yap
+
+
+
+
+🧭 1. Hafta: Temel Altyapı & Prototip
+Gün 1–2: Geliştirme Ortamı & Temel Yüz Algılama
+Stack Seçimi
+Frontend: HTML5 + JavaScript (veya React)
+
+Yüz Algılama: MediaPipe Face Mesh (468 landmark, tarayıcıda çalışır, CPU/GPU dostu)
+
+3D Render: Three.js (veya react-three-fiber)
+
+Webcam: navigator.mediaDevices.getUserMedia veya react-webcam
+
+Kurulum
+bash
+mkdir virtual-tryon-glasses
+cd virtual-tryon-glasses
+npm init -y
+npm install @mediapipe/face_mesh @mediapipe/camera_utils three
+İlk Adım: Webcam + Face Mesh
+MediaPipe Face Mesh’i kur, webcam feed’ini al, 468 landmark’ı ekrana çizdir.
+
+Hedef: Yüz hareket ettikçe landmarkların real-time güncellendiğini görmek.
+
+Örnek iskelet (index.html):
+
+xml
+<video id="input_video" autoplay playsinline></video>
+<canvas id="output_canvas"></canvas>
+<script type="module">
+  import { FaceMesh } from '@mediapipe/face_mesh';
+  import { Camera } from '@mediapipe/camera_utils';
+
+  const video = document.getElementById('input_video');
+  const canvas = document.getElementById('output_canvas');
+  const ctx = canvas.getContext('2d');
+
+  const faceMesh = new FaceMesh({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+  });
+
+  faceMesh.setOptions({
+    maxNumFaces: 1,
+    refineLandmarks: true,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
+
+  faceMesh.onResults((results) => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+    if (results.multiFaceLandmarks) {
+      for (const landmarks of results.multiFaceLandmarks) {
+        // 468 landmark'ı çiz (örnek: 168, 143, 2, 372)
+        landmarks.forEach((point, i) => {
+          const x = point.x * canvas.width;
+          const y = point.y * canvas.height;
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, 2 * Math.PI);
+          ctx.fillStyle = 'red';
+          ctx.fill();
+        });
+      }
+    }
+  });
+
+  const camera = new Camera(video, {
+    onFrame: async () => {
+      await faceMesh.send({ image: video });
+    },
+    width: 640,
+    height: 480,
+  });
+  camera.start();
+</script>
+Gün 3–4: 3D Gözlük Modeli & Temel Yerleştirme
+3D Model Hazırlama
+Blender’da basit bir gözlük modeli oluştur (veya Sketchfab’dan ücretsiz GLB/GLTF indir).
+
+Ölçüler gerçekçi olsun: lens genişliği ~50–55 mm, köprü ~15–20 mm.
+
+GLB/GLTF formatında export et.
+
+Three.js Entegrasyonu
+Three.js ile sahne kur, gözlük modelini yükle.
+
+MediaPipe landmarklarından göz iç köşeleri (143, 372), burun ucu (2), alın merkezi (168) kullanarak gözlüğün pozisyonunu hesapla.
+
+Örnek mantık:
+
+javascript
+// landmarks: [x, y, z] (0–1 arası normalize)
+const leftEye = landmarks[143];
+const rightEye = landmarks[372];
+const noseTip = landmarks[2];
+const forehead = landmarks[168];
+
+// Gözler arası mesafe (pupillary distance proxy)
+const eyeDistance = Math.sqrt(
+  Math.pow((leftEye.x - rightEye.x) * canvas.width, 2) +
+  Math.pow((leftEye.y - rightEye.y) * canvas.height, 2)
+);
+
+// Gözlük pozisyonu (gözlerin ortası, burun köprüsü hizası)
+const glassesX = ((leftEye.x + rightEye.x) / 2) * canvas.width;
+const glassesY = ((leftEye.y + rightEye.y) / 2) * canvas.height;
+const glassesZ = noseTip.z * 1000; // derinlik proxy
+
+// Three.js'te glasses.position.set(glassesX, glassesY, glassesZ);
+Gün 5–7: Pose Estimation & Gerçekçi Hizalama
+Rotasyon Hesaplama
+Yüzün pitch, yaw, roll açılarını landmarklardan türet.
+
+Basit yaklaşım:
+
+Roll: Gözlerin yatay açısı (Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x))
+
+Pitch: Burun ucu ile alın arasındaki dikey fark
+
+Yaw: Burun ucu ile yüz simetri ekseni arasındaki yatay fark
+
+Ölçeklendirme
+Gözler arası mesafeye göre gözlük modelini dinamik scale et.
+
+Test: Kullanıcı kameraya yaklaşınca gözlük büyüsün, uzaklaşınca küçülsün.
+
+Render Pipeline
+Three.js sahnesini requestAnimationFrame ile her frame’de güncelle.
+
+Gözlük modelini landmarklara göre her frame’de yeniden pozisyonla.
+
+🚀 2. Hafta: İyileştirme & Production Hazırlığı
+Gün 8–9: Oklüzyon & Gölge (Depth Awareness)
+Basit oklüzyon: Gözlük saplarının kulak arkasında kalması için depthTest ve depthWrite ayarlarını optimize et.
+
+Gölge: Three.js’te ShadowMaterial ile gözlüğün yüz üzerine gölge düşürmesini sağla.
+
+Gün 10–11: Çerçeve Seçimi & UI
+Kullanıcı gözlük modelini seçebilsin (dropdown veya thumbnail gallery).
+
+Her model için ayrı GLB dosyası yükle.
+
+Renk değiştirme: Three.js’te material.color ile frame rengini dinamik değiştir.
+
+Gün 12–13: Performans & Mobil Optimizasyon
+FPS hedefi: 60 FPS (düşük FPS’te mide bulantısı yapar).
+
+Optimizasyon:
+
+Face Mesh modelini WebAssembly (WASM) ile çalıştır (MediaPipe default olarak WASM kullanıyor).
+
+Three.js’te renderer.setPixelRatio(window.devicePixelRatio) ile mobil ekranlarda performansı dengele.
+
+Gereksiz geometri/texture detaylarını azalt (LOD – Level of Detail).
+
+Gün 14: Test & Deployment
+Test: Farklı ışık, farklı yüz tipleri, farklı cihazlar (iPhone, Android, laptop).
+
+Deployment: Vercel, Netlify, GitHub Pages gibi statik hosting’lere deploy et.
+
+HTTPS: Webcam erişimi için HTTPS şart (localhost hariç).
+
+🛠️ Teknik Stack Özeti
+Katman	Teknoloji	Alternatif
+Yüz Algılama	MediaPipe Face Mesh	TensorFlow.js FaceMesh, Dlib
+3D Render	Three.js	Babylon.js, A-Frame
+Webcam	getUserMedia	react-webcam
+3D Model	GLB/GLTF (Blender)	FBX, OBJ
+Hosting	Vercel / Netlify	GitHub Pages
+Mobil AR (ileri)	ARKit / ARCore	Unity + AR Foundation
+📚 Kaynaklar & Örnek Projeler
+GitHub Örnekleri:
+
+basic-virtual-tryon-glasses
+ – MediaPipe + Three.js minimal demo
+
+Virtual-Glasses-Try-on
+ – Three.js + FaceMesh detaylı implementasyon
+
+MediaPipe Docs: Face Mesh API
+
+Three.js Docs: Loading 3D Models
+
+⚡ İleri Seviye (Opsiyonel)
+Derinlik Sensörü: iPhone X+ cihazlarda ARKit TrueDepth ile daha hassas yüz mesh’i al (Warby Parker’ın kullandığı yöntem).
+
+Makine Öğrenmesi: Kullanıcının yüz ölçülerinden (PD, burun köprüsü) otomatik gözlük numarası önerisi.
+
+Analytics: Kullanıcı hangi çerçeveyi ne kadar denedi, hangi açılarda baktı – bu verileri toplayıp model eğit.
+
+Bu roadmap’i takip edersen, 2 hafta içinde tarayıcıda çalışan, gerçek zamanlı, 3D gözlük deneme sistemi yapmış olursun. İlk prototip için MediaPipe + Three.js stack’i en hızlı ve stabil yol.
+
+md yap bana bunu
+🚀 Sıfırdan Gözlük Virtual Try-On Sistemi — Teknik Roadmap
+Warby Parker benzeri, tarayıcıda çalışan gerçek zamanlı gözlük deneme sistemi için adım adım geliştirme yol haritası.
+
+🧭 Genel Bakış
+Hedef	2 haftada çalışan web prototipi
+Stack	MediaPipe Face Mesh + Three.js + JavaScript
+Platform	Web (Chrome, Safari, Firefox)
+Özellikler	Real-time yüz takibi, 3D gözlük yerleştirme, çerçeve seçimi, mobil uyumlu
+📅 1. Hafta: Temel Altyapı & Prototip
+Gün 1–2: Geliştirme Ortamı & Temel Yüz Algılama
+Stack Seçimi
+Frontend: HTML5 + JavaScript (veya React)
+
+Yüz Algılama: MediaPipe Face Mesh (468 landmark, tarayıcıda çalışır, CPU/GPU dostu)
+
+3D Render: Three.js
+
+Webcam: navigator.mediaDevices.getUserMedia veya react-webcam
+
+Kurulum
+bash
+mkdir virtual-tryon-glasses
+cd virtual-tryon-glasses
+npm init -y
+npm install @mediapipe/face_mesh @mediapipe/camera_utils three
+İlk Adım: Webcam + Face Mesh
+MediaPipe Face Mesh'i kur, webcam feed'ini al, 468 landmark'ı ekrana çizdir.
+
+Hedef: Yüz hareket ettikçe landmarkların real-time güncellendiğini görmek.
+
+Örnek iskelet (index.html):
+
+xml
+<video id="input_video" autoplay playsinline></video>
+<canvas id="output_canvas"></canvas>
+<script type="module">
+  import { FaceMesh } from '@mediapipe/face_mesh';
+  import { Camera } from '@mediapipe/camera_utils';
+
+  const video = document.getElementById('input_video');
+  const canvas = document.getElementById('output_canvas');
+  const ctx = canvas.getContext('2d');
+
+  const faceMesh = new FaceMesh({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+  });
+
+  faceMesh.setOptions({
+    maxNumFaces: 1,
+    refineLandmarks: true,
+    minDetectionConfidence: 0.5,
+    minTrackingConfidence: 0.5,
+  });
+
+  faceMesh.onResults((results) => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+    if (results.multiFaceLandmarks) {
+      for (const landmarks of results.multiFaceLandmarks) {
+        landmarks.forEach((point, i) => {
+          const x = point.x * canvas.width;
+          const y = point.y * canvas.height;
+          ctx.beginPath();
+          ctx.arc(x, y, 2, 0, 2 * Math.PI);
+          ctx.fillStyle = 'red';
+          ctx.fill();
+        });
+      }
+    }
+  });
+
+  const camera = new Camera(video, {
+    onFrame: async () => {
+      await faceMesh.send({ image: video });
+    },
+    width: 640,
+    height: 480,
+  });
+  camera.start();
+</script>
+Gün 3–4: 3D Gözlük Modeli & Temel Yerleştirme
+3D Model Hazırlama
+Blender'da basit bir gözlük modeli oluştur (veya Sketchfab'dan ücretsiz GLB/GLTF indir).
+
+Ölçüler gerçekçi olsun: lens genişliği ~50–55 mm, köprü ~15–20 mm.
+
+GLB/GLTF formatında export et.
+
+Three.js Entegrasyonu
+Three.js ile sahne kur, gözlük modelini yükle.
+
+MediaPipe landmarklarından göz iç köşeleri (143, 372), burun ucu (2), alın merkezi (168) kullanarak gözlüğün pozisyonunu hesapla.
+
+Örnek mantık:
+
+javascript
+// landmarks: [x, y, z] (0–1 arası normalize)
+const leftEye = landmarks[143];
+const rightEye = landmarks[372];
+const noseTip = landmarks[2];
+const forehead = landmarks[168];
+
+// Gözler arası mesafe (pupillary distance proxy)
+const eyeDistance = Math.sqrt(
+  Math.pow((leftEye.x - rightEye.x) * canvas.width, 2) +
+  Math.pow((leftEye.y - rightEye.y) * canvas.height, 2)
+);
+
+// Gözlük pozisyonu (gözlerin ortası, burun köprüsü hizası)
+const glassesX = ((leftEye.x + rightEye.x) / 2) * canvas.width;
+const glassesY = ((leftEye.y + rightEye.y) / 2) * canvas.height;
+const glassesZ = noseTip.z * 1000; // derinlik proxy
+
+// Three.js'te glasses.position.set(glassesX, glassesY, glassesZ);
+Gün 5–7: Pose Estimation & Gerçekçi Hizalama
+Rotasyon Hesaplama
+Yüzün pitch, yaw, roll açılarını landmarklardan türet.
+
+Basit yaklaşım:
+
+Roll: Gözlerin yatay açısı (Math.atan2(rightEye.y - leftEye.y, rightEye.x - leftEye.x))
+
+Pitch: Burun ucu ile alın arasındaki dikey fark
+
+Yaw: Burun ucu ile yüz simetri ekseni arasındaki yatay fark
+
+Ölçeklendirme
+Gözler arası mesafeye göre gözlük modelini dinamik scale et.
+
+Test: Kullanıcı kameraya yaklaşınca gözlük büyüsün, uzaklaşınca küçülsün.
+
+Render Pipeline
+Three.js sahnesini requestAnimationFrame ile her frame'de güncelle.
+
+Gözlük modelini landmarklara göre her frame'de yeniden pozisyonla.
+
+🚀 2. Hafta: İyileştirme & Production Hazırlığı
+Gün 8–9: Oklüzyon & Gölge (Depth Awareness)
+Basit oklüzyon: Gözlük saplarının kulak arkasında kalması için depthTest ve depthWrite ayarlarını optimize et.
+
+Gölge: Three.js'te ShadowMaterial ile gözlüğün yüz üzerine gölge düşürmesini sağla.
+
+Gün 10–11: Çerçeve Seçimi & UI
+Kullanıcı gözlük modelini seçebilsin (dropdown veya thumbnail gallery).
+
+Her model için ayrı GLB dosyası yükle.
+
+Renk değiştirme: Three.js'te material.color ile frame rengini dinamik değiştir.
+
+Gün 12–13: Performans & Mobil Optimizasyon
+FPS hedefi: 60 FPS (düşük FPS'te mide bulantısı yapar).
+
+Optimizasyon:
+
+Face Mesh modelini WebAssembly (WASM) ile çalıştır (MediaPipe default olarak WASM kullanıyor).
+
+Three.js'te renderer.setPixelRatio(window.devicePixelRatio) ile mobil ekranlarda performansı dengele.
+
+Gereksiz geometri/texture detaylarını azalt (LOD – Level of Detail).
+
+Gün 14: Test & Deployment
+Test: Farklı ışık, farklı yüz tipleri, farklı cihazlar (iPhone, Android, laptop).
+
+Deployment: Vercel, Netlify, GitHub Pages gibi statik hosting'lere deploy et.
+
+HTTPS: Webcam erişimi için HTTPS şart (localhost hariç).
+
+🛠️ Teknik Stack Özeti
+Katman	Teknoloji	Alternatif
+Yüz Algılama	MediaPipe Face Mesh	TensorFlow.js FaceMesh, Dlib
+3D Render	Three.js	Babylon.js, A-Frame
+Webcam	getUserMedia	react-webcam
+3D Model	GLB/GLTF (Blender)	FBX, OBJ
+Hosting	Vercel / Netlify	GitHub Pages
+Mobil AR (ileri)	ARKit / ARCore	Unity + AR Foundation
+📚 Kaynaklar & Örnek Projeler
+GitHub Örnekleri
+basic-virtual-tryon-glasses – MediaPipe + Three.js minimal demo
+
+Virtual-Glasses-Try-on – Three.js + FaceMesh detaylı implementasyon
+
+Dokümantasyon
+MediaPipe Face Mesh API
+
+Three.js GLTF Loader
+
+⚡ İleri Seviye (Opsiyonel)
+Derinlik Sensörü: iPhone X+ cihazlarda ARKit TrueDepth ile daha hassas yüz mesh'i al (Warby Parker'ın kullandığı yöntem).
+
+Makine Öğrenmesi: Kullanıcının yüz ölçülerinden (PD, burun köprüsü) otomatik gözlük numarası önerisi.
+
+Analytics: Kullanıcı hangi çerçeveyi ne kadar denedi, hangi açılarda baktı – bu verileri toplayıp model eğit.
+
+
+
+
+
+
+CLAUDE 
+
+
+1. Kamera katmanı — neden TrueDepth şart oldu
+
+iPhone X ve sonrasındaki ön kamerada bir IR nokta projektörü var: yüzüne ~30.000 kızılötesi nokta atıyor, ayrı bir IR kamera bu noktaların desenini okuyor. Noktalar arasındaki bozulmadan structured light triangulation ile piksel başına derinlik çıkarıyorsun. Bu Face ID'yi çalıştıran donanımın aynısı, ve Warby Parker'ın feature'ı bu yüzden iPhone X ve üstüyle sınırlı.
+
+Kritik nokta: bu derinlik haritası metrik. Yani milimetre cinsinden gerçek mesafe veriyor. Neden önemli olduğuna 3. maddede geleceğiz.
+
+2. Yüz geometrisi ve poz
+
+İki ayrı yol var, ikisini de bilmen lazım:
+
+Monoküler yol (sadece RGB, derinlik yok):
+
+Yüz tespiti — hafif bir CNN detektör, tipik olarak BlazeFace tarzı SSD mimarisi. Anchor tabanlı, tek geçişte bounding box + 6 kaba landmark. Mobil GPU'da ~1ms.
+Landmark regresyonu — klasik yöntem 68 noktalı iBUG şeması (dlib'in ERT'si, cascade of regression trees). Modern yöntem MediaPipe Face Mesh: 468 noktalı yoğun mesh, direkt koordinat regresyonu yapan bir CNN.
+Poz çözümü — elinde 2D landmark var, kanonik bir 3D yüz modelinin karşılık gelen noktaları var. solvePnP ile (EPnP + Levenberg-Marquardt refinement) rotasyon R ve translasyon t'yi çözüyorsun. Ama yüz landmarkları neredeyse düzlemsel olduğu için PnP burada kötü koşullanmış — pitch ve z-translasyon birbirine karışır, "flip" yapar.
+Daha doğrusu 3D Morphable Model (3DMM) kullanmak. Blanz & Vetter'ın 1999'daki fikri: yüzü bir lineer bazda ifade et.
+𝑆
+(
+𝛼
+,
+𝛽
+)
+=
+𝑆
+ˉ
++
+𝐴
+id
+ 
+𝛼
++
+𝐴
+exp
+ 
+𝛽
+S(α,β)=
+S
+ˉ
++A
+id
+	​
+
+α+A
+exp
+	​
+
+β
+𝑆
+ˉ
+S
+ˉ
+ ortalama yüz, 
+𝐴
+id
+A
+id
+	​
+
+ taranmış yüzlerden PCA ile çıkarılmış kimlik bazı (Basel Face Model, FLAME), 
+𝐴
+exp
+A
+exp
+	​
+
+ ifade blendshape'leri. Enerji fonksiyonunu 
+𝛼
+,
+𝛽
+,
+𝑅
+,
+𝑡
+α,β,R,t üzerinden minimize ediyorsun:
+𝐸
+=
+∑
+𝑖
+∥
+Π
+(
+𝑅
+ 
+𝑆
+𝑖
++
+𝑡
+)
+−
+𝑢
+𝑖
+∥
+2
+⏟
+landmark reprojeksiyonu
++
+𝜆
+ph
+∥
+𝐼
+render
+−
+𝐼
+obs
+∥
+2
+⏟
+fotometrik
++
+𝜆
+1
+∥
+𝛼
+∥
+2
+𝜎
+id
+2
++
+𝜆
+2
+∥
+𝛽
+∥
+2
+𝜎
+exp
+2
+E=
+landmark reprojeksiyonu
+i
+∑
+	​
+
+∥Π(RS
+i
+	​
+
++t)−u
+i
+	​
+
+∥
+2
+	​
+
+	​
+
++
+fotometrik
+λ
+ph
+	​
+
+∥I
+render
+	​
+
+−I
+obs
+	​
+
+∥
+2
+	​
+
+	​
+
++λ
+1
+	​
+
+σ
+id
+2
+	​
+
+∥α∥
+2
+	​
+
++λ
+2
+	​
+
+σ
+exp
+2
+	​
+
+∥β∥
+2
+	​
+
+Regülarizasyon terimleri şart, yoksa gürültüyü kimlik sanıp yüzü deforme eder. Modern yaklaşım bu optimizasyonu bir CNN'e regresyon olarak öğretmek (3DDFA, DECA) ya da diferansiyellenebilir render (nvdiffrast, PyTorch3D) ile analiz-sentez döngüsü kurmak.
+
+TrueDepth yolu (Warby Parker'ın yaptığı):
+
+ARKit bu işi zaten yapıp sana veriyor. ARFaceAnchor üzerinden:
+
+1220 vertexlik, sabit topolojili bir yüz mesh'i (ARFaceGeometry)
+4×4 dönüşüm matrisi — metre cinsinden, kamera koordinat sisteminde
+52 blendshape katsayısı (göz kırpma, çene açılması, kaş kaldırma...)
+60 Hz'de güncellenen tracking
+
+Yani perception katmanının %90'ını Apple hallediyor. Warby Parker'ın kendi IP'si bundan sonrasında.
+
+3. Ölçek problemi — işin asıl zor kısmı
+
+Bu, gözlük denemeyi Snapchat filtresinden ayıran şey. Monoküler bir kamerayla mutlak ölçeği çözemezsin. Perspektif projeksiyonda gözlemlediğin şey:
+
+𝑢
+=
+𝑓
+𝑋
+𝑍
+u=f
+Z
+X
+	​
+
+
+Yüzün gerçek boyutu 
+𝑋
+X ile mesafe 
+𝑍
+Z çarpımsal olarak eşleşiyor. Büyük bir yüz uzakta ile küçük bir yüz yakında piksel piksel aynı görüntüyü üretir. Bu klasik scale-depth ambiguity.
+
+Snapchat için sorun değil — köpek kulağı yüzün oranında ölçeklenir, kimse fark etmez. Gözlük için felaket. Çünkü:
+
+Gerçek gözlüğün fiziksel ölçüleri sabit (lens genişliği 49mm, köprü 21mm, sap 145mm — çerçevenin içine yazan o rakamlar)
+Senin yüz genişliğin 130mm mi 148mm mi, bu çerçevenin yüzünde nasıl duracağını tamamen değiştirir
+Yanlış ölçekte render edersen her çerçeve herkese "mükemmel" oturur, ki bu bir alışveriş aracı olarak feature'ı işe yaramaz hale getirir
+
+Çözümler:
+
+Metrik derinlik sensörü (TrueDepth / LiDAR) — doğrudan mm veriyor. En temiz yol, WP'nin yolu.
+İstatistiksel önsel — yetişkin ortalama pupil arası mesafe (PD) ~63mm, std ~3.5mm. Bunu ölçek sabiti olarak kullanırsın. Ucuz ama %5-6 hata payıyla yaşarsın.
+Bilinen boyutlu referans nesne — kredi kartını alnına tut (85.6mm, ISO/IEC 7810 standardı sağ olsun). Bazı web VTO çözümleri hâlâ bunu yapıyor.
+Kamera intrinsics — odak uzaklığı ve autofocus mesafe metadata'sı, çoğu web ortamında güvenilir değil.
+
+WP zaten TrueDepth'i önce PD ölçmek ve çerçeve önermek için kullanmıştı, virtual try-on ondan sonra geldi.
+
+4. Yerleştirme çözücüsü — "unique placement"
+
+Burası ticari sırrın olduğu yer. Naif yaklaşım: gözlüğü göz landmarklarının ortasına koy, kafa pozunu uygula, bitti. Sonuç sahte görünür, ve WP'nin ekibi de tam olarak bunu söylüyor — sanal nesnenin yüze "yaklaşık" oturması yetmiyor, kulak, göz ve burun yerleşimiyle birebir eşleşmesi gerekiyor.
+
+Doğru yaklaşım fiziği taklit etmek. Gerçek gözlük üç noktada durur:
+
+Burun sırtı (nazal dorsum) — burun pedleri ya da köprü buraya oturur
+Sol kulak üstü (superior helix bağlantısı)
+Sağ kulak üstü
+
+Üç temas noktası rijit bir cismin pozunu belirler. Yani çözücü şuna benziyor:
+
+1. Simetri düzlemi kısıtı: çerçevenin orta düzlemi yüzün sagital düzlemine hizalanır
+   → yaw ve roll'u kilitler, 6DoF'u 3DoF'a indirir (pitch, y, z)
+
+2. Burun teması: çerçevenin nose pad geometrisinden yüz mesh'ine ray-cast at,
+   ilk kesişimi bul → çerçeveyi yüzey normali boyunca temasa kadar ilerlet
+
+3. Kulak teması: çerçeveyi burun temas noktası etrafında döndür,
+   sap uçları kulak landmarklarına değene kadar → pantoskopik açıyı belirler
+
+4. Penetrasyon kontrolü: sapların yanak/şakak mesh'ini kesip kesmediğini kontrol et
+   Kesiyorsa çerçeve dar demektir → ya sapları esnet ya "fit" skorunu düşür
+
+Bu aslında temas kısıtlı küçük bir optimizasyon problemi. ICP benzeri birkaç iterasyonla ya da doğrudan analitik olarak çözülebilir. Çıktı sadece bir pozdan ibaret değil — aynı zamanda bir uyum skoru üretiyor, ki WP bunu ürün önerisinde kullanıyor.
+
+Buradaki incelik: burun köprüsünün açısı (bazı insanlarda dik, bazılarında yayvan) gözlüğün ne kadar aşağı ineceğini belirler. Aynı çerçeve iki farklı yüzde farklı yükseklikte oturur. Sabit bir offset kullanırsan bu tamamen kaybolur, ve fake görünmesinin bir numaralı sebebi budur.
+
+5. Render
+
+Fotogerçekçilik burada kazanılıyor ya da kaybediliyor. WP'nin ekibi çerçeveleri piksel piksel doğru göstermek için 3D sanatçılarla defalarca revizyon yaptıklarını söylüyor.
+
+PBR materyal. Metalik/pürüzlülük iş akışı, mikrofaset BRDF (GGX/Trowbridge-Reitz dağılımı + Smith geometri terimi). Titanyum çerçeve metallic=1, roughness~0.25. Asetat metallic=0 ama translucent — ışığı içinden geçirir, o yüzden ince bir subsurface yaklaşımı ya da en azından backlight transmission terimi lazım. WP'nin kendi vurguladığı şeylerden biri asetat çerçevede ışığın nasıl süzüldüğünü gösterebilmeleri.
+
+Işık tahmini. Sanal nesnenin ışığı gerçek sahneyle uyuşmazsa beyin anında yakalıyor. ARKit'in yüz takibi modunda ARDirectionalLightEstimate veriyor: ambient yoğunluk (lümen), renk sıcaklığı (Kelvin), ve 2. dereceden küresel harmonik katsayıları — RGB başına 9 katsayı. Yüz, albedosu kabaca bilinen bir Lambert yüzeyi olduğu için aslında ters render ile bu SH'yi görüntüden de çıkarabilirsin.
+
+Occlusion — en kritik tek numara. Sapların kafanın arkasına geçmesi lazım. Yüz mesh'ini renk yazma kapalı, derinlik yazma açık şekilde render ediyorsun (depth-only pass / occlusion mesh). Böylece z-buffer sapları doğru yerde kesiyor. Bunu yapmayan implementasyonlarda gözlük yüzün "üstünde yüzüyor" gibi durur.
+
+Saç ayrı bir dert. Yüz mesh'i saçı içermiyor, o yüzden uzun saçlı birinde sap saçın önünden geçiyor. Çözüm: saç segmentasyon/matting ağı (U-Net tarzı) çalıştırıp alpha maskesiyle sapları maskelemek. Pahalı ve gerçekçilik farkı büyük.
+
+Gölge. Tahmini ana ışık yönünden shadow map alıp yüz mesh'ine projekte ediyorsun, çarpımsal kompozit. En büyük gerçekçilik ipucu burun köprüsündeki temas gölgesi — o küçük koyu şerit olmadığı zaman gözlük yapışkan sticker gibi duruyor.
+
+Lens kırılması. Camdan bakınca arkadaki şey kayar/büyür. Screen-space refraction: sahneyi bir texture'a render et, lens shader'ında kırılma vektörünü hesapla
+
+𝑡
+=
+𝜂
+ 
+𝑖
++
+(
+𝜂
+(
+𝑛
+⋅
+𝑖
+)
+−
+1
+−
+𝜂
+2
+(
+1
+−
+(
+𝑛
+⋅
+𝑖
+)
+2
+)
+)
+𝑛
+t=ηi+(η(n⋅i)−
+1−η
+2
+(1−(n⋅i)
+2
+)
+	​
+
+)n
+
+ve o texture'ı kaydırılmış UV ile örnekle. IOR değerleri: asetat lens ~1.50, polikarbonat 1.586, yüksek indeksli 1.67/1.74. Üstüne Fresnel spekülerlik ve anti-refle kaplamanın o hafif yeşilimsi/morumsu yansıması.
+
+6. Zamansal filtreleme
+
+Landmark tahmini kare başına gürültülü. Ham pozu direkt kullanırsan gözlük titrer. Klasik çözüm One Euro filter (Casiez ve ark., 2012): kesme frekansını hıza göre adapte eden bir alçak geçiren filtre.
+
+𝑓
+𝑐
+=
+𝑓
+𝑐
+𝑚
+𝑖
+𝑛
++
+𝛽
+ 
+∣
+𝑥
+^
+˙
+∣
+f
+c
+	​
+
+=f
+c
+min
+	​
+
+	​
+
++β∣
+x
+^
+˙
+∣
+
+Yavaş hareket → düşük kesme → çok yumuşatma → titreme yok. Hızlı hareket → yüksek kesme → az gecikme. Kalman'a göre tek üstünlüğü ayarlanmasının kolay olması, ve latency/jitter dengesini insan algısına uygun tutması. Rotasyonu quaternion'da SLERP ile yumuşatıyorsun, öteleme ayrı kanalda. 60 fps'te bütçen kare başına 16.6ms.
+
+7. Asset pipeline — kimsenin konuşmadığı kısım
+
+Katalogdaki her SKU için:
+
+Fotogrametri taraması ya da CAD modeli, sonra retopoloji (temiz quad mesh, ~5-15k üçgen)
+UV unwrap + PBR texture set (albedo, roughness, metallic, normal)
+Semantik anchor noktaları: köprü merkezi, burun pedi temas düzlemleri, menteşe eksenleri, sap ucu eğrisi — hepsi kanonik bir koordinat çerçevesinde. Yerleştirme çözücüsü bunlar olmadan generic çalışamaz.
+Gerçek fiziksel ölçülerle kalibrasyon (o çerçevenin içine yazan 49□21-145 gibi rakamlar)
+Mobil için LOD ve texture sıkıştırma (ASTC)
+
+WP'nin 3D sanatçılarla "her çerçeve için pixel-perfect olana kadar" defalarca revizyon yaptığını söylemesi tam olarak bu. Yüzlerce SKU × bu emek = feature'ın gerçek maliyeti. Algoritma bir kez yazılıyor, asset pipeline sonsuza kadar sürüyor.
+
+8. Web tarafı neden daha kötü
+
+Sende derinlik sensörü yok, getUserMedia'dan gelen RGB var. Tipik stack:
+
+MediaPipe Face Mesh veya TensorFlow.js, WASM+SIMD backend (WebGL backend'i küçük modellerde genelde daha yavaş, transfer overhead'i yüzünden)
+468 landmark, "attention mesh" varyantı göz/dudak bölgesini yüksek çözünürlükte iyileştiriyor
+three.js ile WebGL render, occlusion mesh yine depth-only pass
+Kamera intrinsics'i bilmiyorsun → FOV'u ~60° varsayıp geçiyorsun
+Ölçek → PD önseline dayalı tahmin
+
+Sonuç: pozu iyi tutturursun, ölçeği tutturamazsın. WP web'de bir AR try-on denemişti ve kısa süre sonra kaldırdı; sonra native app'e ARKit ile geri döndüler. Site tarafındaki deneme daha çok 2D fotoğraf bazlı kompozit ("fotoğrafını yükle, üstüne bindirelim"), gerçek AR değil. Bu arada iOS app kullanıcılarının dörtte üçü virtual try-on kullanıyor — yani native'de tuttu.
+
+Sektörde bunu servis olarak satan şirketler de var (Fittingbox, Perfect Corp, Ditto, Banuba, Jeeliz) — çoğu markanın kendi ekibi yerine bunlardan birini entegre ettiğini görürsün.
+
+9. Sıfırdan yapacak olsan
+
+MVP (bir hafta sonu): MediaPipe Face Mesh + three.js + tek bir GLB gözlük modeli. Landmark'lardan Procrustes ile rijit poz, PD=63mm sabit ölçek, yüz mesh'i depth-only occlusion. Çalışır, ama sahte durur.
+
+Ciddi versiyon: ARKit/ARCore Augmented Faces ile metrik mesh → temas kısıtlı yerleştirme çözücüsü → SH ışık tahmini + shadow map → screen-space lens refraction → One Euro filtre → düzgün asset pipeline.
+
+En çok kazanç getiren üç şey sırasıyla: occlusion (sapların kafanın arkasına geçmesi), temas gölgesi (burun köprüsündeki), ve doğru metrik ölçek. Bu üçü olmadan ne kadar iyi PBR yaparsan yap sticker gibi durur.

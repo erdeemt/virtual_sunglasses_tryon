@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>VTO Çekirdek — Metrik Ölçek Doğrulama</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div id="fatal" hidden>
+      <div class="fatal-card">
+        <h2>Hata yakalandı</h2>
+        <pre id="fatal-message"></pre>
+        <p class="note">
+          Teşhis anahtarları: <code>?no3d=1</code> 3D sahneyi kapatır ·
+          <code>?cpu=1</code> MediaPipe'ı CPU'ya alır · <code>?no3d=1&amp;cpu=1</code> ikisi birden.
+          Hangisiyle çökme durursa sorun oradadır.
+        </p>
+        <button id="fatal-copy" type="button">Hatayı Kopyala</button>
+        <button id="fatal-reload" type="button">Yeniden Yükle</button>
+      </div>
+    </div>
+
+    <div id="stage">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="three"></canvas>
+      <canvas id="overlay"></canvas>
+
+      <div id="gate" class="gate">
+        <div class="gate-card">
+          <h1>Metrik Ölçek Doğrulama</h1>
+          <p>
+            Bu araç kameranı kullanarak yüz ölçülerini milimetre cinsinden tahmin eder.
+            <strong>Görüntü cihazından çıkmaz</strong> — tüm işlem tarayıcıda yapılır, hiçbir kare
+            sunucuya gönderilmez.
+          </p>
+          <div id="capability" class="cap"></div>
+          <button id="start" type="button">Kamerayı Başlat</button>
+          <p id="gate-error" class="err" hidden></p>
+        </div>
+      </div>
+    </div>
+
+    <aside id="panel" hidden>
+      <header>
+        <span id="fps" class="pill">— FPS</span>
+        <span id="tier" class="pill">—</span>
+        <button id="toggle-panel" type="button" title="Paneli daralt">▾</button>
+      </header>
+
+      <section id="pose-section">
+        <h2>Poz &amp; Ölçüm Kapısı</h2>
+        <div class="bar"><div id="frontality-bar"></div></div>
+        <div id="pose" class="mono"></div>
+        <div id="gate-status" class="status"></div>
+      </section>
+
+      <section>
+        <h2>3D Sahne <small>(Gün 8–9)</small></h2>
+        <label><input type="checkbox" id="show-glasses" checked /> Gözlüğü göster</label>
+        <label>
+          Occluder
+          <select id="occluder-debug">
+            <option value="off">gizli (normal occlusion)</option>
+            <option value="wireframe">wireframe</option>
+            <option value="solid">dolu</option>
+          </select>
+        </label>
+        <label>
+          Çerçeve ölçüsü
+          <select id="frame-size">
+            <option value="45,18,140">45□18-140 (dar)</option>
+            <option value="49,21,145" selected>49□21-145 (orta)</option>
+            <option value="54,20,150">54□20-150 (geniş)</option>
+          </select>
+        </label>
+        <table id="scene-info"></table>
+        <p class="note">
+          Gözlük gerçek fiziksel ölçüleriyle yerleştiriliyor. Ölçek tahmini yanlışsa çerçeve
+          orantısız durur — metrik doğruluk artık görülebilir.
+        </p>
+      </section>
+
+      <section>
+        <h2>Metrik Ölçümler</h2>
+        <table id="measurements"></table>
+      </section>
+
+      <section>
+        <h2>Ölçek Füzyonu</h2>
+        <table id="cues"></table>
+        <div id="fusion-note" class="note"></div>
+      </section>
+
+      <section>
+        <h2>Landmark Denetimi <small>(Gün 3 kapısı)</small></h2>
+
+        <button id="audit-toggle" type="button">Denetimi Başlat</button>
+        <div id="audit-progress" class="pill" style="margin-left: 8px">—</div>
+
+        <div id="audit-body" hidden>
+          <div class="audit-step">
+            <div id="audit-title"></div>
+            <p id="audit-check"></p>
+            <details>
+              <summary>Yanlışsa ne bozulur?</summary>
+              <p id="audit-impact"></p>
+            </details>
+          </div>
+          <div class="audit-actions">
+            <button id="audit-prev" type="button">‹</button>
+            <button id="audit-ok" type="button" class="ok">Doğru</button>
+            <button id="audit-suspect" type="button" class="bad">Şüpheli</button>
+            <button id="audit-next" type="button">›</button>
+          </div>
+        </div>
+
+        <div id="audit-summary" class="note"></div>
+        <button id="audit-report" type="button">Raporu Göster</button>
+        <button id="audit-reset" type="button">Sıfırla</button>
+
+        <hr />
+        <label><input type="checkbox" id="show-all" /> 478 noktanın tümü</label>
+        <label><input type="checkbox" id="show-named" checked /> Adlandırılmış noktalar + etiket</label>
+        <label><input type="checkbox" id="show-plane" checked /> Simetri düzlemi &amp; eksenler</label>
+      </section>
+
+      <section>
+        <h2>Doğruluk Çalışması <small>(Gün 5 kapısı)</small></h2>
+        <label>Denek kodu <input type="text" id="subject" placeholder="S01" /></label>
+        <label>Gerçek PD (mm) <input type="number" id="truth-pd" step="0.5" placeholder="63.0" /></label>
+        <button id="record" type="button">Ölçümü Kaydet</button>
+        <button id="export" type="button">JSON İndir</button>
+        <div id="records" class="records"></div>
+      </section>
+    </aside>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

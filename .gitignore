@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.vite/
+*.local
+.DS_Store
+*.tsbuildinfo
+
+# Ölçüm çalışması çıktıları (kişisel veri içerebilir — repoya girmez)
+/data/sessions/
+*.session.json
