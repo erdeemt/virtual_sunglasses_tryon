@@ -1,0 +1,14 @@
+# Satır sonlarını repoda LF olarak sabitle.
+# Olmazsa Windows/macOS karışık ekipte her dosya sahte diff üretir.
+* text=auto eol=lf
+
+# Metin olarak işlenmemesi gerekenler
+*.png binary
+*.jpg binary
+*.webp binary
+*.glb binary
+*.gltf binary
+*.task binary
+*.wasm binary
+*.tflite binary
+*.ktx2 binary
