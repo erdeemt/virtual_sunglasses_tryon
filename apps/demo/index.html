@@ -66,6 +66,7 @@
             <option value="solid">dolu</option>
           </select>
         </label>
+        <label><input type="checkbox" id="show-anchors" /> Anchor noktalarını göster</label>
         <label>
           Çerçeve ölçüsü
           <select id="frame-size">
@@ -78,6 +79,42 @@
         <p class="note">
           Gözlük gerçek fiziksel ölçüleriyle yerleştiriliyor. Ölçek tahmini yanlışsa çerçeve
           orantısız durur — metrik doğruluk artık görülebilir.
+        </p>
+      </section>
+
+      <section>
+        <h2>Hazır Model Yükle <small>(.glb / .gltf)</small></h2>
+
+        <div id="drop-zone">
+          <strong>GLB dosyasını buraya sürükle</strong>
+          <span>veya tıkla</span>
+          <input type="file" id="glb-input" accept=".glb,.gltf" hidden />
+        </div>
+
+        <label>
+          Gerçek ön genişlik (mm)
+          <input type="number" id="front-width" value="138" min="80" max="200" step="1" />
+        </label>
+
+        <div id="glb-controls" hidden>
+          <label>
+            Yönelim düzeltmesi
+            <select id="glb-up">
+              <option value="auto">otomatik</option>
+              <option value="y">Y yukarı</option>
+              <option value="z">Z yukarı</option>
+              <option value="x">X yukarı</option>
+            </select>
+          </label>
+          <label><input type="checkbox" id="glb-flip" /> Saplar ters yönde (180° çevir)</label>
+          <button id="glb-reload" type="button">Yeniden Yükle</button>
+          <button id="glb-clear" type="button">Parametrik Modele Dön</button>
+        </div>
+
+        <div id="glb-info" class="mono"></div>
+        <p class="note">
+          Anchor'lar geometriden türetiliyor (köprü, menteşe, sap ucu). "Anchor noktalarını
+          göster" ile doğru yerde olduklarını kontrol et — yerleştirme çözücüsü bunlara güvenecek.
         </p>
       </section>
 

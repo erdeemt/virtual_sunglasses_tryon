@@ -9,6 +9,13 @@ export {
   type BuiltFrame,
 } from './frameModel.js';
 export {
+  loadFrameFromGLB,
+  normalizeFrame,
+  type NormalizeOptions,
+  type LoadedFrame,
+  type LoadedFrameInfo,
+} from './gltf.js';
+export {
   unprojectToMM,
   unprojectPoint,
   faceDistanceMM,

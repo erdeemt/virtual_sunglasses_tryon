@@ -13,6 +13,7 @@ import { specLabel, TryOnScene, type OccluderDebug } from '@vto/render';
 import { drawOverlay, type OverlayFlags } from './overlay.js';
 import { Study } from './study.js';
 import { Audit } from './audit.js';
+import { setupGlbLoader } from './glbLoader.js';
 
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -485,15 +486,20 @@ function record(): void {
 
 // ---------------------------------------------------------------- sahne kontrolleri
 
-function applySceneControls(): void {
+/** GLB yüklüyken ölçü seçici parametrik modeli geri getirmemeli. */
+let usingLoadedFrame = false;
+
+function applySceneControls(rebuildParametric = true): void {
   if (!scene) return;
+
+  if (rebuildParametric && !usingLoadedFrame) {
+    const [w, b, t] = el<HTMLSelectElement>('frame-size').value.split(',').map(Number);
+    scene.setFrameSpec({ ...scene.spec, lensWidth: w!, bridgeWidth: b!, templeLength: t! });
+  }
+
   scene.setGlassesVisible(el<HTMLInputElement>('show-glasses').checked);
   scene.setOccluderDebug(el<HTMLSelectElement>('occluder-debug').value as OccluderDebug);
-
-  const [w, b, t] = el<HTMLSelectElement>('frame-size').value.split(',').map(Number);
-  scene.setFrameSpec({ ...scene.spec, lensWidth: w!, bridgeWidth: b!, templeLength: t! });
-  // setFrameSpec yeni bir grup kuruyor; görünürlüğü tekrar uygula.
-  scene.setGlassesVisible(el<HTMLInputElement>('show-glasses').checked);
+  scene.setAnchorsVisible(el<HTMLInputElement>('show-anchors').checked);
 }
 
 function updateSceneInfo(): void {
@@ -571,9 +577,17 @@ el('audit-suspect').addEventListener('click', () => {
   audit.next();
   renderAudit();
 });
-for (const id of ['show-glasses', 'occluder-debug', 'frame-size']) {
-  el(id).addEventListener('change', applySceneControls);
+for (const id of ['show-glasses', 'occluder-debug', 'frame-size', 'show-anchors']) {
+  el(id).addEventListener('change', () => applySceneControls());
 }
+
+setupGlbLoader({
+  getScene: () => scene,
+  onLoaded: () => {
+    usingLoadedFrame = !el('glb-controls').hidden;
+    applySceneControls(false);
+  },
+});
 
 el('fatal-copy').addEventListener('click', () => {
   void navigator.clipboard.writeText(el('fatal-message').textContent ?? '');

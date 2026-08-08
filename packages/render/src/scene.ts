@@ -29,6 +29,8 @@ export class TryOnScene {
   private readonly fovYDeg: number;
   private readonly maxPixelRatio: number;
   private mmBuffer = new Float32Array(478 * 3);
+  private anchorHelpers: THREE.Group | null = null;
+  private anchorsVisible = false;
 
   /** Son hesaplanan yerleştirme — panelde göstermek için. */
   lastPlacement: { distanceMM: number; rollDeg: number; visible: boolean } = {
@@ -90,10 +92,71 @@ export class TryOnScene {
   }
 
   setFrameSpec(spec: FrameSpec): void {
+    this.swapFrame(buildFrame(spec));
+  }
+
+  /** Yüklenen bir GLB modelini devreye al (bkz. gltf.ts). */
+  setFrame(frame: BuiltFrame): void {
+    this.swapFrame(frame);
+  }
+
+  private swapFrame(next: BuiltFrame): void {
+    const wasVisible = this.frame.group.visible;
     this.scene.remove(this.frame.group);
     this.frame.dispose();
-    this.frame = buildFrame(spec);
+    this.frame = next;
+    this.frame.group.visible = wasVisible;
     this.scene.add(this.frame.group);
+    this.refreshAnchorHelpers();
+  }
+
+  /**
+   * Anchor noktalarını görselleştir.
+   *
+   * GLB'lerde anchor'lar geometriden TÜREtiliyor (heuristik). Çözücü yanlış
+   * çalışıyorsa ilk şüpheli burasıdır — gözle bakılabilmesi şart.
+   */
+  setAnchorsVisible(visible: boolean): void {
+    this.anchorsVisible = visible;
+    this.refreshAnchorHelpers();
+  }
+
+  private refreshAnchorHelpers(): void {
+    if (this.anchorHelpers) {
+      this.frame.group.remove(this.anchorHelpers);
+      this.anchorHelpers.traverse((n) => {
+        if (n instanceof THREE.Mesh) n.geometry.dispose();
+      });
+      this.anchorHelpers = null;
+    }
+    if (!this.anchorsVisible) return;
+
+    const helpers = new THREE.Group();
+    helpers.name = 'anchor-helpers';
+    const palette: Record<string, number> = {
+      bridgeCenter: 0xff3b3b,
+      nosePadL: 0xffa63b,
+      nosePadR: 0xffa63b,
+      hingeL: 0x3bff7a,
+      hingeR: 0x3bff7a,
+      templeTipL: 0x3ba8ff,
+      templeTipR: 0x3ba8ff,
+      lensCenterL: 0xc86ae0,
+      lensCenterR: 0xc86ae0,
+    };
+
+    for (const [name, point] of Object.entries(this.frame.anchors)) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(2.2, 10, 8),
+        new THREE.MeshBasicMaterial({ color: palette[name] ?? 0xffffff, depthTest: false }),
+      );
+      dot.position.copy(point as THREE.Vector3);
+      dot.renderOrder = 999;
+      helpers.add(dot);
+    }
+
+    this.anchorHelpers = helpers;
+    this.frame.group.add(helpers);
   }
 
   get spec(): FrameSpec {
