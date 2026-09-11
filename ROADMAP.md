@@ -6,6 +6,24 @@
 
 ---
 
+## Durum — 11 Eylül 2026
+
+Planın **teknik çekirdeği** tamamlandı. Açık kalanlar: doğruluk kanıtı,
+parametre kalibrasyonu, ekranda görsel doğrulama ve ticarileştirme katmanı.
+
+| Blok | Durum |
+|---|---|
+| Perception + metrik ölçek (Gün 1–7) | ✅ — kart kalibrasyonu (Gün 6) ve worker (Gün 2) hariç |
+| Çözücü + occlusion + gölge + saç + fit (Gün 8–14) | ✅ kod ve testler · ⚠ görsel doğrulama ve kalibrasyon bekliyor |
+| Render kalitesi (Gün 15–18) | 🟡 PBR, ortam haritası, lens transmission, ışık tahmini ✅ · reçete simülasyonu ❌ |
+| Asset (Gün 19–20) | 🟡 GLB yükleyici + isimli parça sözleşmesi ✅ · Blender CLI ❌ |
+| Embed + backend (Gün 22–23) | 🟡 `<glasses-tryon>` ✅ (gzip 4.2 kB, motor lazy) · backend ❌ |
+| Doğruluk çalışması (Gün 25) | ❌ **T-00 hâlâ bloke ediyor** |
+
+Ayrıntı ve sıradaki işler: [docs/TASKS.md](docs/TASKS.md).
+
+---
+
 ## 0. Yönetici Özeti — Kapsam Dürüstlüğü
 
 28 günde **çıkan**:

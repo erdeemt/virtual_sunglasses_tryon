@@ -35,8 +35,11 @@ export function trianglesFromTesselation(connections: readonly Connection[]): Ui
 
 export class FaceOccluder {
   readonly mesh: THREE.Mesh;
-  private readonly geometry: THREE.BufferGeometry;
-  private readonly positions: Float32Array;
+  /** Gölge alıcı ve kontak AO aynı geometriyi paylaşıyor — tek güncelleme. */
+  readonly geometry: THREE.BufferGeometry;
+  /** Kamera uzayında mm; yerleştirme çözücüsü doğrudan bunu kullanıyor. */
+  readonly positions: Float32Array;
+  readonly indices: Uint16Array;
   private scratch: Float32Array;
 
   /** Tesselation yalnızca 468 yüz noktasını kapsar; iris (468-477) hariç. */
@@ -45,10 +48,11 @@ export class FaceOccluder {
   constructor(tesselation: readonly Connection[]) {
     this.positions = new Float32Array(this.vertexCount * 3);
     this.scratch = new Float32Array(478 * 3);
+    this.indices = trianglesFromTesselation(tesselation);
 
     this.geometry = new THREE.BufferGeometry();
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
-    this.geometry.setIndex(new THREE.BufferAttribute(trianglesFromTesselation(tesselation), 1));
+    this.geometry.setIndex(new THREE.BufferAttribute(this.indices, 1));
 
     const material = new THREE.MeshBasicMaterial({
       colorWrite: false, // renk yazma — yalnızca derinlik

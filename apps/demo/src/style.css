@@ -476,3 +476,121 @@ hr {
 .q-bad {
   color: var(--bad);
 }
+
+/* ---------------------------------------------------------------- panel ekleri */
+
+.pill.link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.timings {
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.gate-link {
+  display: inline-block;
+  margin-left: 12px;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 8px 0;
+}
+
+.attribution a {
+  color: var(--dim);
+}
+
+h3 {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  color: var(--dim);
+  font-weight: 600;
+}
+
+h3 small {
+  font-weight: 400;
+  color: #5d6875;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: #7d8896;
+  vertical-align: 1px;
+}
+
+/* ---------------------------------------------------------------- fit */
+
+.fit-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.fit-score {
+  font: 700 38px/1 ui-monospace, Consolas, monospace;
+  min-width: 64px;
+}
+
+.fit-verdict {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.fit-table td {
+  padding: 6px 0;
+}
+
+.fit-table .note {
+  margin: 2px 0 0;
+  font-size: 11px;
+}
+
+.fit-bar {
+  height: 4px;
+  margin-top: 5px;
+  background: #0e1216;
+  border-radius: 2px;
+  overflow: hidden;
+  max-width: 180px;
+}
+
+.fit-bar i {
+  display: block;
+  height: 100%;
+}
+
+.fit-bar i.ok {
+  background: var(--ok);
+}
+
+.fit-bar i.warn {
+  background: var(--warn);
+}
+
+.fit-bar i.bad {
+  background: var(--bad);
+}
+
+.fit-notes {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--warn);
+  font-size: 12px;
+}
+
+.fit-notes li {
+  margin: 4px 0;
+}

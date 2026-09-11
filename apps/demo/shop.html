@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Optik Demo Mağaza — Sanal Deneme</title>
+    <link rel="stylesheet" href="./src/shop.css" />
+  </head>
+  <body>
+    <header class="shop-header">
+      <strong class="logo">OPTİK<span>·</span>DEMO</strong>
+      <nav>
+        <a href="#urunler">Ürünler</a>
+        <a href="#entegrasyon">Entegrasyon</a>
+        <a href="/">Geliştirme paneli</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1>Almadan önce yüzünde dene.</h1>
+        <p>
+          Çerçeveler gerçek milimetre ölçüleriyle yerleştirilir — hangi bedenin sana uyduğunu
+          görürsün, sadece nasıl göründüğünü değil. Kamera görüntün cihazından çıkmaz.
+        </p>
+      </section>
+
+      <section class="grid" id="urunler">
+        <article class="product">
+          <div class="shot sun"></div>
+          <div class="meta">
+            <h2>Aviator Güneş</h2>
+            <p class="size">150 mm · polarize değil · iridesan kaplama</p>
+            <p class="price">₺2.490</p>
+          </div>
+          <glasses-tryon model="/models/glasses/khronos-sunglasses.glb" label="Aviator Güneş"></glasses-tryon>
+        </article>
+
+        <article class="product">
+          <div class="shot classic"></div>
+          <div class="meta">
+            <h2>Klasik Optik</h2>
+            <p class="size">49□21-145 · orta beden</p>
+            <p class="price">₺1.790</p>
+          </div>
+          <glasses-tryon spec="49,21,145" label="Klasik Optik — 49□21-145"></glasses-tryon>
+        </article>
+
+        <article class="product">
+          <div class="shot wide"></div>
+          <div class="meta">
+            <h2>Klasik Optik Geniş</h2>
+            <p class="size">54□20-150 · geniş beden</p>
+            <p class="price">₺1.790</p>
+          </div>
+          <glasses-tryon spec="54,20,150" label="Klasik Optik — 54□20-150"></glasses-tryon>
+        </article>
+
+        <article class="product">
+          <div class="shot narrow"></div>
+          <div class="meta">
+            <h2>Klasik Optik Dar</h2>
+            <p class="size">45□18-140 · dar beden</p>
+            <p class="price">₺1.790</p>
+          </div>
+          <glasses-tryon spec="45,18,140" label="Klasik Optik — 45□18-140" accent="#0f766e"></glasses-tryon>
+        </article>
+      </section>
+
+      <section class="panel" id="entegrasyon">
+        <div>
+          <h2>Entegrasyon</h2>
+          <p>Markanın sitesine eklemek iki satır:</p>
+          <pre><code>&lt;script type="module" src="https://cdn.ornek.io/v1/embed.js"&gt;&lt;/script&gt;
+&lt;glasses-tryon model="/modeller/aviator.glb" label="Aviator"&gt;&lt;/glasses-tryon&gt;</code></pre>
+          <p class="muted">
+            Widget Shadow DOM içinde çalışır — sitenin CSS'i onu bozamaz. Ağır motor (3D +
+            yüz takibi) yalnızca "Sanal Dene"ye basılınca yüklenir; sayfa açılış hızını etkilemez.
+          </p>
+        </div>
+        <div>
+          <h2>Olaylar <small>(canlı)</small></h2>
+          <p class="muted">Widget'ın yayınladığı olaylar — sepete ekleme, analitik ya da reçete formu bunları dinler.</p>
+          <pre id="event-log" class="log">Bir ürünü dene, olaylar burada görünecek…</pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="shop-footer">
+      Demo güneş gözlüğü modeli: "SunglassesKhronos" — Eric Chadwick, Darmstadt Graphics Group,
+      <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY-4.0</a>.
+      Khronos logoları içerir; yalnızca demo amaçlı.
+    </footer>
+
+    <script type="module" src="./src/shop.ts"></script>
+  </body>
+</html>

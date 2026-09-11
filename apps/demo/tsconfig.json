@@ -4,7 +4,9 @@
     "types": ["vite/client", "node"],
     "paths": {
       "@vto/core": ["../../packages/core/src/index.ts"],
-      "@vto/render": ["../../packages/render/src/index.ts"]
+      "@vto/render": ["../../packages/render/src/index.ts"],
+      "@vto/engine": ["../../packages/engine/src/index.ts"],
+      "@vto/embed": ["../../packages/embed/src/index.ts"]
     }
   },
   "include": ["src/**/*.ts", "vite.config.ts"]

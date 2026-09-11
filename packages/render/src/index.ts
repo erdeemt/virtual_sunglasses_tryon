@@ -1,4 +1,15 @@
-export { TryOnScene, type SceneOptions, type OccluderDebug } from './scene.js';
+export {
+  TryOnScene,
+  type SceneOptions,
+  type SceneUpdate,
+  type OccluderDebug,
+  type RenderQuality,
+} from './scene.js';
+export { glassesGeometry } from './glassesGeometry.js';
+export { LightEstimator, type LightEstimate } from './lighting.js';
+export { HairOccluder } from './hairOccluder.js';
+export { ContactShadow } from './contactShadow.js';
+export type { ScaleMode } from './gltf.js';
 export { FaceOccluder, trianglesFromTesselation, type Connection } from './faceMesh.js';
 export {
   buildFrame,

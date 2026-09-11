@@ -1,11 +1,12 @@
-import { loadFrameFromGLB, type LoadedFrame, type TryOnScene } from '@vto/render';
+import type { TryOnEngine } from '@vto/engine';
+import type { ScaleMode } from '@vto/render';
 
 /**
  * Demo'nun GLB yükleme arayüzü.
  *
- * Amaç: internetten indirilen herhangi bir gözlük modelini repoya
- * commit'lemeden anında test edebilmek. Dosya tarayıcıda kalır, hiçbir yere
- * yüklenmez.
+ * İnternetten indirilen herhangi bir gözlük modelini repoya commit'lemeden
+ * anında test etmek için. Dosya tarayıcıda kalır, hiçbir yere yüklenmez.
+ * Yükleme motor üzerinden yapılıyor ki fit geçmişi de sıfırlansın.
  */
 
 const el = <T extends HTMLElement>(id: string): T => {
@@ -15,53 +16,58 @@ const el = <T extends HTMLElement>(id: string): T => {
 };
 
 export interface GlbLoaderHooks {
-  getScene(): TryOnScene | null;
-  onLoaded(): void;
+  getEngine(): TryOnEngine | null;
+  onLoaded(source: 'file' | 'url'): void;
 }
 
-export function setupGlbLoader(hooks: GlbLoaderHooks): void {
+export interface GlbLoader {
+  load(source: File | string, label: string): Promise<void>;
+  clearInfo(): void;
+}
+
+const ANCHOR_COUNT = 9;
+
+export function setupGlbLoader(hooks: GlbLoaderHooks): GlbLoader {
   const dropZone = el('drop-zone');
   const input = el<HTMLInputElement>('glb-input');
   const controls = el('glb-controls');
   const info = el('glb-info');
 
-  let lastFile: File | null = null;
-  let current: LoadedFrame | null = null;
+  let last: { source: File | string; label: string } | null = null;
 
-  async function load(file: File): Promise<void> {
-    const scene = hooks.getScene();
-    if (!scene) {
+  async function load(source: File | string, label: string): Promise<void> {
+    const engine = hooks.getEngine();
+    if (!engine?.scene) {
       info.innerHTML = '<span class="q-bad">Önce kamerayı başlat.</span>';
       return;
     }
 
-    lastFile = file;
-    info.textContent = `${file.name} yükleniyor…`;
+    last = { source, label };
+    info.textContent = `${label} yükleniyor…`;
 
     const upValue = el<HTMLSelectElement>('glb-up').value;
-    const frontWidth = Number(el<HTMLInputElement>('front-width').value) || 138;
-
     try {
-      const frame = await loadFrameFromGLB(file, {
-        frontWidthMM: frontWidth,
+      const frame = await engine.loadGlasses(source, {
+        frontWidthMM: Number(el<HTMLInputElement>('front-width').value) || 138,
+        scaleMode: el<HTMLSelectElement>('glb-scale').value as ScaleMode,
         upAxis: upValue === 'auto' ? undefined : (upValue as 'x' | 'y' | 'z'),
         flipForward: el<HTMLInputElement>('glb-flip').checked ? true : undefined,
-        spec: scene.spec,
       });
 
-      current = frame;
-      scene.setFrame(frame);
       controls.hidden = false;
-      hooks.onLoaded();
+      hooks.onLoaded(typeof source === 'string' ? 'url' : 'file');
 
       const i = frame.info;
+      const s = frame.spec;
+      const size = typeof source === 'string' ? '' : ` (${(source.size / 1024 / 1024).toFixed(1)} MB)`;
       const lines = [
-        `dosya      ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`,
+        `dosya      ${label}${size}`,
         `mesh       ${i.meshCount} · ${i.triangleCount.toLocaleString('tr')} üçgen`,
-        `ham ölçü   ${fmtVec(i.rawSize)}`,
-        `ölçek      ×${i.scaleFactor.toPrecision(3)} → ${frontWidth} mm genişlik`,
+        `ölçek      ${i.scaleMode === 'meters' ? 'glTF metre (×1000)' : `genişliğe oturtuldu (×${i.scaleFactor.toPrecision(3)})`}`,
+        `ön genişlik ${i.frontWidthMM.toFixed(1)} mm`,
+        `lens       ${s.lensWidth} × ${s.lensHeight} mm · köprü ${s.bridgeWidth} mm`,
         `eksenler   yukarı=${i.detectedUp} · ileri=${i.detectedForward}`,
-        `malzeme    ${i.materialNames.slice(0, 3).join(', ') || '(yok)'}`,
+        `anchor     ${i.namedAnchors.length}/${ANCHOR_COUNT} isimli parçadan, gerisi heuristik`,
       ];
       info.textContent = lines.join('\n');
 
@@ -73,15 +79,18 @@ export function setupGlbLoader(hooks: GlbLoaderHooks): void {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      info.innerHTML = `<span class="q-bad">Yüklenemedi: ${message}</span>`;
+      info.innerHTML = '';
+      const node = document.createElement('span');
+      node.className = 'q-bad';
+      node.textContent = `Yüklenemedi: ${message}`;
+      info.appendChild(node);
     }
   }
 
   dropZone.addEventListener('click', () => input.click());
-
   input.addEventListener('change', () => {
     const file = input.files?.[0];
-    if (file) void load(file);
+    if (file) void load(file, file.name);
   });
 
   for (const type of ['dragenter', 'dragover'] as const) {
@@ -96,37 +105,28 @@ export function setupGlbLoader(hooks: GlbLoaderHooks): void {
       dropZone.classList.remove('dragover');
     });
   }
-
   dropZone.addEventListener('drop', (e) => {
     const file = e.dataTransfer?.files?.[0];
-    if (file) void load(file);
+    if (file) void load(file, file.name);
   });
 
   el('glb-reload').addEventListener('click', () => {
-    if (lastFile) void load(lastFile);
+    if (last) void load(last.source, last.label);
   });
 
-  el('glb-clear').addEventListener('click', () => {
-    const scene = hooks.getScene();
-    if (!scene) return;
-    // Parametrik modele dönmek için mevcut spec ile yeniden kur.
-    scene.setFrameSpec(scene.spec);
-    current = null;
-    controls.hidden = true;
-    info.textContent = '';
-    hooks.onLoaded();
-  });
-
-  // Yönelim değişince otomatik yeniden yükle — deneme yanılma hızlansın.
-  for (const id of ['glb-up', 'glb-flip', 'front-width']) {
+  // Ayar değişince otomatik yeniden yükle — deneme yanılma hızlansın.
+  for (const id of ['glb-up', 'glb-flip', 'front-width', 'glb-scale']) {
     el(id).addEventListener('change', () => {
-      if (lastFile) void load(lastFile);
+      if (last) void load(last.source, last.label);
     });
   }
 
-  void current;
-}
-
-function fmtVec(v: { x: number; y: number; z: number }): string {
-  return `${v.x.toPrecision(3)} × ${v.y.toPrecision(3)} × ${v.z.toPrecision(3)}`;
+  return {
+    load,
+    clearInfo() {
+      last = null;
+      controls.hidden = true;
+      info.textContent = '';
+    },
+  };
 }

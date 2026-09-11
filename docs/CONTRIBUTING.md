@@ -11,7 +11,7 @@ doküman, sonra [TASKS.md](TASKS.md).
 git clone <repo>
 cd gozluk
 npm install
-npm run setup        # MediaPipe WASM + model (~3.6 MB indirir)
+npm run setup        # WASM + yüz/saç modelleri + demo gözlük (~5 MB)
 npm run dev          # https://localhost:5173
 ```
 
@@ -19,7 +19,8 @@ Sertifika kendinden imzalı, tarayıcı uyarısını bir kez geç.
 
 Sonra sırayla:
 
-1. **Demo'yu aç, kamerayı başlat.** Yüzünde landmarklar ve gözlük görmelisin.
+0. **`/shop.html`'i aç**, bir üründe "Sanal Dene"ye bas. Müşterinin göreceği ürün bu.
+1. **Paneli (`/`) aç, kamerayı başlat.** Yüzünde gözlük ve sağda fit raporu görmelisin.
 2. **"Denetimi Başlat"a bas**, 5 adımı gez. Bu, hangi landmark'ın ne olduğunu
    öğrenmenin en hızlı yolu.
 3. **Occluder'ı `wireframe` yap.** Yüz mesh'inin nasıl bir şey olduğunu gör.
@@ -52,7 +53,11 @@ Bir şey çalışmıyorsa önce bunlarla bisect et:
 |---|---|
 | `?no3d=1` | three.js sahnesini tamamen kapatır |
 | `?cpu=1` | MediaPipe'ı GPU yerine CPU delegesiyle çalıştırır |
+| `?nohair=1` | saç segmentasyonunu kapatır |
 | `?no3d=1&cpu=1` | ikisi birden |
+
+Paneldeki zamanlama satırı (`saç · çöz · çiz ms`) hangi aşamanın pahalı olduğunu
+gösterir. Mağaza sayfası: `/shop.html`.
 
 Hangisinde sorun kayboluyorsa suçlu odur. Hata olursa ekranda mesaj + stack +
 cihaz bilgisi gösteren bir kart çıkar; "Hatayı Kopyala" ile paylaş.

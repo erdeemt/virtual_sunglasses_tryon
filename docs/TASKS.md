@@ -1,235 +1,143 @@
 # Görevler ve İş Bölümü
 
-İki kişilik ekip. Görevler **çakışmayacak şekilde** paketlere ayrıldı —
-aynı dosyada iki kişi çalışmasın diye.
+İki kişilik ekip. Görevler **çakışmayacak şekilde** paketlere ayrıldı.
 
-Strateji ve takvim: [../ROADMAP.md](../ROADMAP.md)
-Sistem nasıl çalışıyor: [ARCHITECTURE.md](ARCHITECTURE.md)
+Strateji: [../ROADMAP.md](../ROADMAP.md) · Sistem: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
 
-## İş Bölümü Önerisi
+## İş Bölümü
 
 | Alan | Paketler | Kim |
 |---|---|---|
-| **Perception & Metrik** | `packages/core` | A (mevcut context sahibi) |
-| **Render & Görsel** | `packages/render` | B (yeni) |
-| **Demo/UI** | `apps/demo` | ortak — küçük dosyalar, çakışma riski düşük |
-| **Asset pipeline** | `packages/asset-cli` (henüz yok) | B |
-| **Backend/Embed** | `apps/api`, `packages/embed` (henüz yok) | A |
+| **Algılama, ölçek, çözücü, motor** | `packages/core`, `packages/engine` | A |
+| **Render, görsel ayar, asset** | `packages/render`, `packages/asset-cli` (yok) | B |
+| **Widget & backend** | `packages/embed`, `apps/api` (yok) | A |
+| **Demo** | `apps/demo` | ortak |
 
-**Kural:** bir görevi almadan önce issue'yu kendine ata. `packages/core` ve
-`packages/render` aynı anda iki kişi tarafından değiştirilmemeli.
-
----
-
-## Öncelik Sırası
-
-Roadmap'in kendi ifadesi: *"En çok kazanç getiren üç şey sırasıyla: occlusion,
-temas gölgesi, doğru metrik ölçek."* Occlusion ✅ yapıldı, metrik ölçek ✅
-yapısal olarak doğrulandı, temas gölgesi ❌ eksik.
-
-```
-ACİL       T-00  Gün 5 kapısı — gerçek PD ölçümü
-           T-01  Temas-kısıtlı yerleştirme çözücüsü
-           T-02  Temas gölgesi
-SONRA      T-03  Fit skoru + optik ölçüm raporu
-           T-04  Saç matting
-           T-05  Kart kalibrasyonu
-           T-06  SH ışık tahmini
-ALTYAPI    T-07  Perception → Web Worker
-           T-08  Asset pipeline CLI
-           T-09  Gerçek SKU'lar
-           T-10  Embed widget + lazy load
-           T-11  Backend / multi-tenant
-```
+**Kural:** görev almadan önce issue'yu kendine ata. `core` ve `render` aynı anda iki
+kişi tarafından değiştirilmemeli.
 
 ---
 
-## T-00 · Gün 5 Kapısı: Gerçek PD Ölçümü 🔴 BLOKE EDİYOR
+## Durum Özeti
 
-**Kim:** ikisi de (farklı yüz tipleri lazım)
-**Kod yok** — ölçüm işi.
-
-Ürünün "±2 mm" iddiası kanıtlanmadı. Bu kapı geçilmeden doğruluk iddiası
-hiçbir yerde yazılmamalı.
-
-**Yapılacak:**
-1. En az 3 kişi, tercihen farklı yüz tiplerinden (dar/geniş, kadın/erkek)
-2. Gerçek PD'yi bul:
-   - Optikteki gözlük sipariş kaydında yazıyor (en kolay)
-   - Cetvel + ayna yöntemi (±1–2 mm)
-   - Optikte dijital pupilometre (en doğrusu, ücretsiz)
-3. Demo panelinde "Doğruluk Çalışması" → denek kodu + gerçek PD → Kaydet
-4. "JSON İndir" → `docs/accuracy-report.md` olarak özetle
-
-**Kabul kriteri:** n ≥ 3, MAE ve bias raporlanmış.
-
-**Karar:**
-- MAE < %4 → devam, kart kalibrasyonu (T-05) opsiyonel kalır
-- MAE > %4 → T-05 zorunlu hale gelir, ürün konumlandırması değişir
-- **bias** > 2 mm → priorlar sistematik kaymış, `anthropometry.ts` düzeltilir
-  (tek satır, kolay). Özellikle `bizygomatic` şüpheli — gerçek zygion değil
-  yüz ovali proxy'si ölçüyor.
+| # | Görev | Durum |
+|---|---|---|
+| T-00 | Gerçek PD ile doğruluk ölçümü | 🔴 **açık — bloke ediyor** |
+| T-01 | Temas-kısıtlı yerleştirme çözücüsü | ✅ kod · ⚠ görsel doğrulama (T-13) · kalibrasyon (T-12) |
+| T-02 | Temas gölgesi | ✅ kod · ⚠ görsel ayar |
+| T-03 | Fit skoru + optik ölçüm raporu | ✅ kod · ⚠ kalibrasyon |
+| T-04 | Saç occlusion'ı | ✅ kod · ⚠ görsel |
+| T-05 | Kart kalibrasyonu | ⏳ |
+| T-06 | Işık tahmini | 🟡 yön/renk/şiddet ✅ · tam SH ⏳ |
+| T-07 | Perception → Web Worker | ⏳ (artık daha önemli: saç + çözücü de ana thread'de) |
+| T-08 | Asset pipeline CLI | ⏳ · isimli parça sözleşmesi ara çözüm olarak ✅ |
+| T-09 | Gerçek SKU kataloğu | ⏳ · yalnızca demo modeli var |
+| T-10 | Embed widget | ✅ · CDN kütüphane build'i ⏳ |
+| T-11 | Backend / multi-tenant | ⏳ |
+| T-12 | Çözücü parametre kalibrasyonu | ⏳ **yeni** |
+| T-13 | Görsel doğrulama turu | ⏳ **yeni — sıradaki iş** |
+| T-14 | Reçete lens simülasyonu | ⏳ |
+| T-15 | Playwright uçtan uca testler | ⏳ |
 
 ---
 
-## T-01 · Temas-Kısıtlı Yerleştirme Çözücüsü 🔴
+## T-13 · Görsel Doğrulama Turu 🔴 SIRADAKİ
 
-**Kim:** A · **Dosya:** `packages/core/src/solver/` (yeni) · **Tahmin:** 2 gün
+**Kim:** ikisi de, farklı cihazlarda · **Kod yok**, gözlem
 
-Şu anki yerleştirme naif (burun kökü + sabit 13 mm offset) ve sahte görünüyor.
-Gerçek gözlük **üç noktada** durur: burun sırtı + sol/sağ kulak üstü.
+Bugün yazılanların hepsi testlerle doğrulandı ama **hiçbiri ekranda görülmedi.**
+Paneli aç, her madde için ekran görüntüsü al, issue'ya ekle:
 
-**Algoritma:**
+| # | Kontrol | Nasıl | Beklenen |
+|---|---|---|---|
+| 1 | Çözücü aktif | Panel → "Yerleşim" | "temas çözücüsü" (yedek değil) |
+| 2 | Oturma yüksekliği | gerçek gözlüğünle karşılaştır | pupil lensin üst yarısında, lens gözün üstünde değil |
+| 3 | Burun şekline tepki | iki farklı burunlu kişi | ped yüksekliği farklı olmalı |
+| 4 | Occlusion | başı 45° çevir | sap kulağın arkasına geçer |
+| 5 | Saç | uzun saçlı denek | sap saçın arkasında |
+| 6 | Kontak gölgesi | "Gölgeler" aç/kapat | ped altında koyu leke, gözlük "yapışkan" durmaz |
+| 7 | Işık | yandan lamba | çerçeve gölgesi ışığın karşısına düşer |
+| 8 | Lens kırılması | Khronos modeli | lens arkasındaki yüz koyu tonlu görünür, siyah değil |
+| 9 | Kararlılık | kafayı yavaş salla | gözlük kaymaz, nefes almaz |
+| 10 | Fit skoru | 30 sn bekle | ±2'den fazla oynamaz |
+| 11 | FPS | panel üstü | high kademe ≥ 30, mid ≥ 24 |
+| 12 | Mağaza | `/shop.html` | 4 ürün, "Sanal Dene" açılır, olay günlüğü dolar |
+| 13 | Lazy load | Ağ sekmesi, mağaza açılışı | three.js/MediaPipe inmez; "Sanal Dene"de iner |
 
-```
-1. SİMETRİ KISITI
-   Çerçeve orta düzlemi ← yüzün sagital düzlemine hizala
-   → yaw ve roll kilitlenir; 6DoF → 3DoF (pitch, y, z)
-
-2. BURUN TEMASI
-   Çerçevenin nose-pad anchor'larından yüz mesh'ine ray-cast
-   ilk kesişimi bul → yüzey normali boyunca temasa kadar ilerlet
-   → y ve z belirlenir
-
-3. KULAK TEMASI → pitch
-   Çerçeveyi burun temas noktası etrafında döndür,
-   sap uçları kulak üstü noktasına değene kadar
-   → pantoskopik açı doğal olarak ortaya çıkar
-
-4. PENETRASYON KONTROLÜ
-   Saplar yanak/şakak mesh'ini kesiyor mu?
-   Kesiyorsa çerçeve dar → sapları esnet (±3°) VE fit skorunu düşür
-```
-
-**Girdi:** metrik yüz mesh'i (`unprojectToMM` çıktısı) + `FrameAnchors`
-**Çıktı:** `{ position, quaternion, contactPoints, penetrationDepth }`
-
-**Dikkat:** kulak üstü noktası MediaPipe mesh'inde **yok** (ARKit'te de yok).
-Landmark 234/454 tragion *proxy*'sidir, superior helix değil. Şimdilik
-antropometrik offset kullan, `docs/` içine varsayımı yaz.
-
-**Kabul kriteri:**
-- Aynı çerçeve iki farklı yüzde **farklı yükseklikte** oturuyor (asıl amaç bu)
-- Birim test: bilinen geometride bilinen temas noktaları çıkıyor
-- Sabit offset kodu tamamen kalkmış
+Başarısız olan her madde bir bug issue'su olur.
 
 ---
 
-## T-02 · Temas Gölgesi ⭐ 🔴
+## T-00 · Gerçek PD Ölçümü 🔴 BLOKE EDİYOR
 
-**Kim:** B · **Dosya:** `packages/render/src/shadow.ts` (yeni) · **Tahmin:** 1 gün
+**Kim:** ikisi de · **Kod yok**
 
-Burun köprüsündeki o küçük koyu şerit. Roadmap: *"olmadığında gözlük yapışkan
-sticker gibi durur"* — en büyük tek gerçekçilik ipucu.
+"±2 mm" iddiası kanıtlanmadı. Bu kapı geçilmeden doğruluk iddiası hiçbir yerde
+(pitch deck, müşteri görüşmesi, README) yazılmamalı.
 
-**Yaklaşım (ucuzdan pahalıya, ucuzla başla):**
-1. Köprü çevresine baked contact-AO decal — neredeyse bedava, etkisi büyük
-2. Tahmini ana ışık yönünden shadow map → yüz mesh'ine projekte, çarpımsal kompozit
+1. En az 3 kişi, farklı yüz tipleri (dar/geniş, kadın/erkek, gözlüklü/gözlüksüz)
+2. Gerçek PD: optik sipariş kaydı · cetvel+ayna (±1–2 mm) · dijital pupilometre
+3. Panel → "Doğruluk Çalışması" → denek kodu + gerçek PD → Kaydet → JSON İndir
+4. `docs/accuracy-report.md` olarak özetle
 
-Kademe bütçesine uy: `low` kademede sadece (1), `high`'da (2).
-
-**Kabul kriteri:** yan yana ekran görüntüsü (gölgeli/gölgesiz), fark gözle net.
-
----
-
-## T-03 · Fit Skoru + Optik Ölçüm Raporu 🟡
-
-**Kim:** A · **Dosya:** `packages/core/src/fit/` (yeni) · **Bağımlı:** T-01
-
-B2B satışının **asıl argümanı.** Try-on eğlence, ölçüm para kazandırır.
-
-```ts
-type FitReport = {
-  score: number;                  // 0..100
-  verdict: 'too-narrow' | 'good' | 'too-wide';
-  sizeSuggestion: -1 | 0 | 1;
-  breakdown: {
-    frameWidthVsFace, bridgeVsNose, templeLengthVsEar,
-    lensHeightVsPupil, penetration, pantoscopicTilt, vertexDistance
-  };
-};
-```
-
-Ayrıca reçeteli lens siparişi için gereken 5 parametre — mağazada
-optometristin yaptığı iş:
-
-| Parametre | Hedef doğruluk |
-|---|---|
-| Monoküler PD (OD/OS ayrı) | ±1 mm |
-| Segment height | ±1.5 mm |
-| Vertex distance | ±1.5 mm |
-| Pantoskopik açı | ±2° |
-| Frame wrap | ±2° |
-
-**Dikkat:** fit skoru **yumuşatılmalı/kilitlenmeli.** 78↔81 arası oynayan bir
-skor güveni yok eder.
-
-**Ağırlıklar tahminle bırakılmaz** — T-00'ın verisiyle kalibre edilir.
+**Karar:** MAE < %4 → devam · MAE > %4 → T-05 zorunlu · **bias** > 2 mm →
+`anthropometry.ts` prior'ları kaydır (özellikle `bizygomatic`, proxy ölçüyor).
 
 ---
 
-## T-04 · Saç Matting (Occlusion Tamamlama) 🟡
+## T-12 · Çözücü Parametre Kalibrasyonu 🟡
 
-**Kim:** B · **Dosya:** `packages/core/src/perception/hair.ts` + render tarafı
+**Kim:** A · **Dosya:** `packages/core/src/solver/placement.ts` · **Bağımlı:** T-13
 
-Yüz mesh'i saçı içermez → uzun saçlı kullanıcıda sap saçın önünden geçer.
-WP'de bile zayıf olan bir yer — gerçek fark yaratma fırsatı.
+Çözücünün ampirik parametreleri:
 
-**Yaklaşım:** MediaPipe `ImageSegmenter`, `selfie_multiclass_256x256` modeli
-(hazır `hair` sınıfı var, kendi U-Net'ini eğitme).
+| Parametre | Varsayılan | Anlamı |
+|---|---|---|
+| `templePull` (k) | 1.0 | sap gerginliği / yerçekimi |
+| `restPrior` (λ) | 0.06 | burun şekli ne kadar etkili (küçük = daha etkili) |
+| `padRestBelowPupil` (h₀) | 2 mm | pedlerin pupil hattına göre yeri |
+| `earAboveOval` / `earBehindOval` | 10 / 30 mm | kulak üstü temas tahmini |
 
-**Performans:** 4–8 ms — her karede sığmaz. `mid` kademede 3 karede bir
-çalıştır, aradaki karelerde maskeyi kafa pozu delta'sıyla reproject et
-(ekran uzayında affine warp yeterli). Maske kenarını 2–3 px feather'la,
-aksi halde "makas" gibi görünür.
+**Yöntem:** 10+ kişinin **gerçek gözlükle** önden fotoğrafı. Her fotoğrafta pupil
+ile lens alt kenarı arası piksel → ölçekle mm. Aynı kişi aynı çerçeve ölçüsüyle
+panelde → çözücünün segment yüksekliği. Farkın ortalamasını h₀ ile, burun
+tiplerine göre dağılımını λ ile kapat.
 
-**Kabul kriteri:** uzun saçlı bir denekte sap saçın arkasında; FPS düşüşü
-kademe bütçesi içinde.
+**Kabul:** 10 kişide segment yüksekliği MAE < 3 mm.
+
+---
+
+## T-03 devamı · Fit Kalibrasyonu 🟡
+
+**Kim:** A · **Bağımlı:** T-00, T-12
+
+`fit.ts` içindeki ideal aralıklar ve ağırlıklar literatür başlangıcı. T-00 ve
+T-12 verisiyle: optisyenin "uygun / dar / geniş" dediği çerçevelerle skorun
+uyuşmasını ölç. Uyuşma < %80 ise aralıkları ayarla.
 
 ---
 
 ## T-05 · Kart Kalibrasyonu 🟡
 
-**Kim:** A · **Dosya:** `packages/core/src/metric/calibration.ts` · **Bağımlı:** T-00
+**Kim:** A · **Dosya:** `packages/core/src/metric/calibration.ts`
 
-Sistematik hatayı %3.5'ten ~%1'e düşürür.
+Sistematik hatayı %3.5'ten ~%1'e düşürür. ISO/IEC 7810 ID-1 kart (85.60 × 53.98 mm)
+alına tutulur, sonuç profile yazılır. Köşeleri otomatik bulmak yerine
+**sürüklenebilir 4 tutamaç** — daha güvenilir, 10× az kod.
 
-ISO/IEC 7810 ID-1 kart (85.60 × 53.98 mm — her banka/kimlik kartı) alına
-tutulur, aynı karede yüz ölçütleri gerçek mm'ye kalibre edilir, sonuç
-kullanıcı profiline yazılır (bir kez, `localStorage`).
-
-**Uygulama notu:** kartın 4 köşesini otomatik bulmak (contour + `approxPolyDP`)
-yerine **kullanıcıya sürüklenebilir 4 tutamaç göster** — daha güvenilir ve
-10× daha az kod.
-
-**Kabul kriteri:** kalibrasyonlu ölçümde MAE < %1.5.
+**Kabul:** kalibrasyonlu MAE < %1.5.
 
 ---
 
-## T-06 · SH Işık Tahmini 🟢
+## T-07 · Web Worker 🟡
 
-**Kim:** B · **Dosya:** `packages/render/src/lighting.ts`
+**Kim:** A · **Tahmin:** 1–2 gün
 
-Sanal nesnenin ışığı sahneyle uyuşmazsa beyin anında yakalar. Yüz, albedosu
-kabaca bilinen bir Lambert yüzeyi → ters render ile 2. derece küresel harmonik
-(RGB başına 9 katsayı) görüntüden çıkarılabilir. Alın/yanak örneklerinden en
-küçük kareler, zamansal olarak yavaş yumuşat (ışık ani değişmez).
-
-Web'de yapan neredeyse yok. Orta maliyet, yüksek getiri.
-
----
-
-## T-07 · Perception → Web Worker 🟢
-
-**Kim:** A · **Tahmin:** 1 gün
-
-`packages/core` bu amaçla DOM'suz yazıldı, taşıma hazır. Perception ana
-thread'i bloklamamalı — render ile aynı karede yarışıyorlar.
-
-`OffscreenCanvas` + `ImageBitmap` transfer. Kademe bütçesindeki
-`perceptionHz` ayrımı ancak bundan sonra anlamlı olur.
+Şu an ana thread'de: FaceLandmarker (3–8 ms) + saç (4–8 ms, N karede bir) +
+çözücü (1–3 ms) + render. `core` DOM'suz yazıldı, taşıma hazır. `OffscreenCanvas`
++ `ImageBitmap` transfer. Saç ve landmarker aynı worker'da.
 
 ---
 
@@ -237,91 +145,78 @@ thread'i bloklamamalı — render ile aynı karede yarışıyorlar.
 
 **Kim:** B · **Dosya:** `packages/asset-cli/`
 
-SaaS'ta **marjı belirleyen kalem.** SKU başına elle iş 20 dakikanın altına
-inmezse 200 SKU'lu bir müşteri kârsızlaşır.
+SaaS'ta **marjı belirleyen kalem** — SKU başına iş 20 dakikanın altına inmeli.
 
-```
-npx vto-asset build ./raw/sku-1234
-```
+Ara çözüm var: **isimli parça sözleşmesi** (ARCHITECTURE §8). Tedarikçiden gelen
+GLB'de düğüm adları `nosepad` / `temple` / `earhook` / `lens` / `frame` içeriyorsa
+anchor'lar gerçek geometriden çıkıyor — Khronos modelinde 9/9 anchor'un çoğu böyle.
 
-Blender headless (`bpy`) + glTF-Transform: LOD (3 kademe), KTX2/Basis texture,
-Draco/meshopt sıkıştırma.
-
-**Doğrulama kapıları (hepsi CLI'da fail eder):**
-- Anchor eksik/NaN mı?
-- Üçgen sayısı ve texture boyutu bütçe içinde mi?
-- Fiziksel ölçüler mesh geometrisiyle tutarlı mı (±1 mm)? ← *en sık hata*
-- Menteşe eksenleri simetrik mi?
-- Ölçek birimi metre mi? (Blender'dan cm/inç gelmesi klasik)
-
-**Renk varyantları ayrı GLB değil** — tek mesh + malzeme override. 1 SKU × 6
-renk = 1 indirme.
+CLI'ın işi: bu sözleşmeyi doğrulamak + LOD + KTX2 + ölçü tutarlılığı kontrolü
+(`49□21-145` ↔ mesh ±1 mm) + manifest.
 
 ---
 
-## T-09 · Gerçek SKU Kataloğu 🟢
+## T-10 devamı · CDN Kütüphane Build'i 🟢
 
-**Kim:** B · **Bağımlı:** T-08
+**Kim:** A
 
-5–8 gerçek çerçeve. Parametrik model yerini alır ama arayüz
-(`geometry + anchors`) aynı kalır.
-
----
-
-## T-10 · Embed Widget + Lazy Load 🟢
-
-**Kim:** A · **Dosya:** `packages/embed/`
-
-```html
-<script src="https://cdn.vto.io/v1/embed.js" data-tenant="pk_live_..." defer></script>
-<glasses-tryon sku="RB2140-901" mode="modal" theme="dark"></glasses-tryon>
-```
-
-**Kritik kısıtlar:**
-- **Shadow DOM zorunlu** — marka CSS'i widget'ı bozmasın (B2B destek
-  biletlerinin en büyük kaynağı)
-- **`embed.js` < 15 kB.** Şu an bundle 738 kB (three.js). Ağır motor yalnızca
-  kullanıcı "Dene"ye bastığında yüklenmeli — marka sayfasının Core Web
-  Vitals'ını bozmak ilk itiraz sebebi olur.
-- Event API: `vto:ready`, `vto:fit`, `vto:measure`, `vto:capture`, `vto:error`
+`<glasses-tryon>` çalışıyor ama şu an demo uygulamasının parçası olarak derleniyor.
+Gerekli: `vite build --lib` ile bağımsız `embed.js` + motor parçası, sürümlü CDN
+yolu (`/v1/`), `asset-base`'in CDN'e varsayılanı, tenant anahtarı niteliği.
 
 ---
 
-## T-11 · Backend / Multi-Tenant 🟢
+## T-11 · Backend 🟢
 
-**Kim:** A · **Dosya:** `apps/api/`
-
-Cloudflare Workers + R2 + D1.
+**Kim:** A · Cloudflare Workers + R2 + D1
 
 ```
-GET  /v1/tenant/:pk/config    → tema, aktif SKU listesi
-GET  /v1/sku/:tenant/:sku     → imzalı R2 URL (kısa TTL)
-POST /v1/events               → batch analytics (kamera verisi YOK)
+GET  /v1/tenant/:pk/config    tema, aktif SKU listesi
+GET  /v1/sku/:tenant/:sku     imzalı R2 URL (kısa TTL)
+POST /v1/events               batch analitik — kamera verisi YOK
 ```
 
-Origin allowlist per `pk_live_*`. **Usage metering ilk günden yazılmalı** —
-sonradan eklemek acı verir.
+Origin allowlist per `pk_live_*`. Usage metering ilk günden.
 
 ---
 
-## Küçük İşler / Teknik Borç
+## T-14 · Reçete Lens Simülasyonu 🟢
+
+**Kim:** B · **Dosya:** `packages/render/src/lens.ts`
+
+Rakiplerde olmayan fark: diyoptri girilince spectacle magnification
+(`SM ≈ 1/(1 − d·F)`) ile göz küçülür/büyür, minus lenste kenar kalınlaşır, 1.50 vs
+1.74 indeks yan yana → doğrudan upsell aracı. Transmission altyapısı artık hazır
+(video WebGL'de).
+
+---
+
+## T-15 · Playwright Uçtan Uca 🟢
+
+**Kim:** B
+
+`--use-file-for-fake-video-capture` ile sabit video → regresyon: FPS, çözücü
+durumu, fit skoru kararlılığı, mağaza lazy load'u (ağ isteklerinde three.js yok).
+
+---
+
+## Küçük İşler
 
 | # | İş | Dosya |
 |---|---|---|
-| D-1 | FPS'i gerçek cihazlarda ölç, kademe bütçelerini gerçek sayılara göre ayarla | `capability.ts` |
-| D-2 | `placeFrame()` kare başına ~10 `Vector3` tahsis ediyor — havuzla | `scene.ts` |
-| D-3 | Playwright + fake camera stream ile regresyon testi | `test/e2e/` |
-| D-4 | `?no3d=1` / `?cpu=1` teşhis anahtarlarını README'ye ekle | ✅ yapıldı |
-| D-5 | Kamera cihaz seçici (birden fazla kamera olan makineler) | `main.ts` |
-| D-6 | `bizygomatic` prior'ını T-00 verisiyle kalibre et | `anthropometry.ts` |
-| D-7 | Occluder mesh'e göz/ağız delikleri — şu an göz kapağı gözlüğü kesebilir | `faceMesh.ts` |
+| D-1 | Kademe bütçelerini gerçek FPS ölçümüyle ayarla | `capability.ts` |
+| D-2 | `placeNaive` ve anchor dönüşümlerinde kare başına `Vector3` tahsisi | `scene.ts` |
+| D-5 | Kamera cihaz seçici | `engine/camera.ts` |
+| D-7 | Occluder'da göz/ağız delikleri — göz kapağı lensi kesebilir | `faceMesh.ts` |
+| D-8 | Parametrik çerçeveye görünür burun pedi geometrisi | `frameModel.ts` |
+| D-9 | Saç maskesini karelar arasında poz deltasıyla reproject et | `hairOccluder.ts` |
+| D-10 | Gölge bias/opaklık değerlerini görsel olarak ayarla | `scene.ts`, `contactShadow.ts` |
 
 ---
 
 ## Görev Alma Akışı
 
-1. GitHub'da issue aç (veya var olanı kendine ata)
-2. Branch: `t01-contact-solver` gibi görev kodundan
+1. Issue aç ya da kendine ata
+2. Branch: `t12-solver-calibration` gibi
 3. `npm run typecheck && npx vitest run` yeşil olmadan PR açma
-4. PR açıklamasına **kabul kriterinin nasıl doğrulandığını** yaz
-   — görsel işlerde ekran görüntüsü/video şart, ben ekranı göremiyorum
+4. PR'da kabul kriterinin nasıl doğrulandığı — **görsel işlerde ekran görüntüsü şart**

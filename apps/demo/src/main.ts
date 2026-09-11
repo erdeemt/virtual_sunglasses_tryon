@@ -1,19 +1,29 @@
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import {
-  EXPECTED_LANDMARK_COUNT,
-  detectCapability,
-  MetricEstimator,
   OneEuroFilter,
   PRIORS,
-  toFaceUnits,
+  detectCapability,
   type Capability,
+  type ConstraintKey,
   type EstimatorFrame,
+  type RestStatus,
 } from '@vto/core';
-import { specLabel, TryOnScene, type OccluderDebug } from '@vto/render';
+import { TryOnEngine, type EngineFrame } from '@vto/engine';
+import { specLabel, type OccluderDebug } from '@vto/render';
 import { drawOverlay, type OverlayFlags } from './overlay.js';
 import { Study } from './study.js';
 import { Audit } from './audit.js';
 import { setupGlbLoader } from './glbLoader.js';
+import { renderFit } from './fitPanel.js';
+
+/**
+ * Geliştirme paneli.
+ *
+ * Pipeline'ın kendisi @vto/engine içinde — bu dosya yalnızca motorun
+ * yayınladığı olaylara abone olup teşhis araçlarını çiziyor (landmark
+ * overlay'i, denetim modu, doğruluk çalışması, çözücü durumu). Embed widget
+ * aynı motoru kullanıyor; burada görülen davranış müşterinin göreceği
+ * davranışla aynı.
+ */
 
 const el = <T extends HTMLElement>(id: string): T => {
   const node = document.getElementById(id);
@@ -26,32 +36,48 @@ const canvas = el<HTMLCanvasElement>('overlay');
 const threeCanvas = el<HTMLCanvasElement>('three');
 const ctx = canvas.getContext('2d')!;
 const panel = el('panel');
-let scene: TryOnScene | null = null;
 
 /**
- * Teşhis anahtarları.
- *
- * Çökme sebebini tahminle aramak yerine bisect etmek için: 3D sahne ve
- * MediaPipe GPU delegesi bağımsız olarak kapatılabiliyor. Hangi kombinasyonda
- * çökme duruyorsa suçlu odur.
+ * Teşhis anahtarları — bir sorunu tahminle aramak yerine bisect etmek için.
+ *   ?no3d=1   three.js sahnesi kapalı
+ *   ?cpu=1    MediaPipe CPU delegesi
+ *   ?nohair=1 saç segmentasyonu kapalı
  */
 const params = new URLSearchParams(location.search);
 const USE_3D = !params.has('no3d');
 const FORCE_CPU = params.has('cpu');
+const NO_HAIR = params.has('nohair');
+
+const DEMO_MODEL_URL = '/models/glasses/khronos-sunglasses.glb';
 
 const study = new Study();
 const audit = new Audit();
 let auditActive = false;
 let capability: Capability;
-let loopStopped = false;
-let landmarker: FaceLandmarker | null = null;
-let estimator = new MetricEstimator();
+let engine: TryOnEngine | null = null;
 let lastState: EstimatorFrame['state'] = null;
+let modelChoice: 'parametric' | 'khronos' | 'custom' = 'parametric';
 
 /** Görüntülenen sayıları yumuşat — okunamayan titrek rakamlar güven kaybettirir. */
 const displayFilters = {
   pd: new OneEuroFilter({ minCutoff: 0.6, beta: 0.01 }),
   fps: new OneEuroFilter({ minCutoff: 1.5, beta: 0.01 }),
+};
+
+const STATUS_LABEL: Record<RestStatus, string> = {
+  nose: '<span class="q-ok">burunda</span>',
+  'rides-high': '<span class="q-warn">yukarıda — köprü dar</span>',
+  'slides-low': '<span class="q-warn">aşağı kayıyor — köprü geniş</span>',
+  'on-cheeks': '<span class="q-warn">yanaklara değiyor</span>',
+  'on-lashes': '<span class="q-warn">kirpiğe yakın</span>',
+};
+
+const CONSTRAINT_LABEL: Record<ConstraintKey, string> = {
+  pads: 'burun pedleri',
+  bridge: 'köprü',
+  cheeks: 'yanak',
+  brow: 'kaş',
+  lashes: 'kirpik',
 };
 
 // ---------------------------------------------------------------- yetenek
@@ -68,6 +94,7 @@ async function showCapability(): Promise<void> {
     `çekirdek      ${c.cores}${c.deviceMemoryGB ? ` · ${c.deviceMemoryGB} GB` : ''}`,
     `GPU           ${c.gpuRenderer || '(bilgi verilmiyor)'}`,
     `perception    ${c.budget.perceptionHz} Hz · render ${c.budget.renderFps} FPS`,
+    `saç maskesi   ${c.budget.hairSegmentEvery > 0 ? `${c.budget.hairSegmentEvery} karede bir` : 'kapalı (kademe)'}`,
   ].join('\n');
 
   el<HTMLSpanElement>('tier').textContent = `${c.tier} · ${c.budget.perceptionHz}Hz`;
@@ -92,17 +119,14 @@ function fail(message: string): void {
 let fatalShown = false;
 
 /**
- * Çökmeyi teşhis edilebilir kıl.
- *
- * Eski hali: loop() içindeki bir istisna her karede tekrar atılıyordu
- * (requestAnimationFrame en başta çağrıldığı için döngü durmuyordu) —
- * saniyede 60 hata, konsol dolup sekme kilitleniyor. Kullanıcıya bu
- * "çökme" olarak görünüyor. Artık ilk hatada duruyor ve gösteriliyor.
+ * Çökmeyi teşhis edilebilir kıl: ilk hatada dur ve mesaj + stack + cihaz
+ * bilgisiyle göster. (Eskiden render döngüsünde atılan tek bir istisna
+ * saniyede 60 kez tekrarlanıp sekmeyi kilitliyordu.)
  */
 function showFatal(context: string, error: unknown): void {
   if (fatalShown) return;
   fatalShown = true;
-  loopStopped = true;
+  engine?.stop();
 
   const err = error instanceof Error ? error : new Error(String(error));
   const lines = [
@@ -111,6 +135,7 @@ function showFatal(context: string, error: unknown): void {
     '',
     `3D:      ${USE_3D ? 'açık' : 'kapalı (?no3d=1)'}`,
     `delege:  ${FORCE_CPU ? 'CPU (?cpu=1)' : capability?.tier === 'low' ? 'CPU (düşük kademe)' : 'GPU'}`,
+    `saç:     ${NO_HAIR ? 'kapalı (?nohair=1)' : engine?.hairAvailable ? 'açık' : 'yok'}`,
     `kademe:  ${capability?.tier ?? '?'}`,
     `GPU:     ${capability?.gpuRenderer || '(bilgi yok)'}`,
     `tarayıcı:${navigator.userAgent}`,
@@ -125,237 +150,75 @@ function showFatal(context: string, error: unknown): void {
 window.addEventListener('error', (e) => showFatal('window.error', e.error ?? e.message));
 window.addEventListener('unhandledrejection', (e) => showFatal('promise', e.reason));
 
-// ---------------------------------------------------------------- kamera
-
-let activeStream: MediaStream | null = null;
-
-/**
- * Kamerayı kademeli olarak açar.
- *
- * Sabit bir çözünürlük istemek çoğu cihazda çalışır ama bazılarında —
- * özellikle sanal kameralar, bazı dizüstü sürücüleri ve kamera başka bir
- * uygulama tarafından tutulduğunda — NotReadableError üretir. Kısıtları
- * gevşeterek yeniden denemek bu vakaların çoğunu kurtarıyor.
- */
-async function openCamera(): Promise<MediaStream> {
-  const attempts: MediaStreamConstraints[] = [
-    { video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } }, audio: false },
-    { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false },
-    { video: { facingMode: 'user' }, audio: false },
-    { video: true, audio: false },
-  ];
-
-  let lastError: unknown;
-  for (const constraints of attempts) {
-    try {
-      return await navigator.mediaDevices.getUserMedia(constraints);
-    } catch (error) {
-      lastError = error;
-      // İzin reddi kısıt gevşetmekle çözülmez — hemen çık.
-      const name = error instanceof Error ? error.name : '';
-      if (name === 'NotAllowedError' || name === 'SecurityError') throw error;
-    }
-  }
-  throw lastError;
-}
-
-/** Akışı serbest bırak — bırakılmazsa sonraki sekme/yenileme kamerayı açamaz. */
-function releaseCamera(): void {
-  activeStream?.getTracks().forEach((track) => track.stop());
-  activeStream = null;
-}
-
-// Sayfa kapanırken/yenilenirken kamerayı bırak. Bu yapılmazsa her yenileme
-// bir akış sızdırıyor ve Windows'ta ikinci açılış "Could not start video
-// source" ile düşüyor.
-window.addEventListener('pagehide', releaseCamera);
-window.addEventListener('beforeunload', releaseCamera);
-
-function cameraErrorMessage(error: unknown): string {
-  const name = error instanceof Error ? error.name : '';
-  const detail = error instanceof Error ? error.message : String(error);
-
-  switch (name) {
-    case 'NotAllowedError':
-    case 'SecurityError':
-      return 'Kamera izni reddedildi. Adres çubuğundaki kamera simgesinden izin verip tekrar dene.';
-    case 'NotReadableError':
-    case 'TrackStartError':
-      return (
-        'Kamera başka bir uygulama tarafından kullanılıyor. Kontrol et: ' +
-        'bu sitenin diğer sekmeleri, Zoom / Teams / OBS / Windows Kamera uygulaması. ' +
-        'Hepsini kapatıp tekrar dene.'
-      );
-    case 'NotFoundError':
-    case 'DevicesNotFoundError':
-      return 'Kamera bulunamadı. Cihazın bağlı ve Windows gizlilik ayarlarında etkin olduğundan emin ol.';
-    case 'OverconstrainedError':
-      return 'Kamera istenen çözünürlüğü desteklemiyor. (Gevşetilmiş ayarlar da başarısız oldu.)';
-    default:
-      return `Başlatılamadı: ${detail}`;
-  }
-}
-
 // ---------------------------------------------------------------- başlatma
 
 async function start(): Promise<void> {
   const button = el<HTMLButtonElement>('start');
   button.disabled = true;
-  button.textContent = 'Yükleniyor…';
-
-  // Tekrar denemede eski akış hâlâ açıksa kamera meşgul kalır.
-  releaseCamera();
+  button.textContent = 'Modeller yükleniyor…';
 
   try {
-    const stream = await openCamera();
-    activeStream = stream;
-    video.srcObject = stream;
-    await video.play();
-    await new Promise<void>((resolve) => {
-      if (video.videoWidth > 0) return resolve();
-      video.addEventListener('loadedmetadata', () => resolve(), { once: true });
-    });
+    if (!engine) {
+      engine = await TryOnEngine.create({
+        video,
+        canvas: threeCanvas,
+        capability,
+        forceCPU: FORCE_CPU,
+        enable3D: USE_3D,
+        ...(NO_HAIR ? { enableHair: false } : {}),
+      });
+      engine.on('frame', onFrame);
+      engine.on('fit', (fit) => renderFit(el('fit'), fit));
+      engine.on('error', (error) => showFatal('motor', error));
+    }
 
-    // WASM ve model yerel olarak servis ediliyor (npm run setup) — çalışma
-    // anında CDN bağımlılığı yok. Bkz. scripts/setup-assets.mjs.
-    const fileset = await FilesetResolver.forVisionTasks('/mediapipe/wasm');
-    landmarker = await FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: {
-        modelAssetPath: '/models/face_landmarker.task',
-        // GPU delegesi kendi WebGL bağlamını açıyor. three.js'in bağlamıyla
-        // aynı karede çalışması bazı sürücülerde (özellikle Windows/ANGLE)
-        // sorun çıkarabiliyor — ?cpu=1 bunu izole etmek için.
-        delegate: FORCE_CPU || capability.tier === 'low' ? 'CPU' : 'GPU',
-      },
-      runningMode: 'VIDEO',
-      numFaces: 1,
-      outputFaceBlendshapes: false,
-      outputFacialTransformationMatrixes: false,
-      minFaceDetectionConfidence: 0.5,
-      minFacePresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    });
+    button.textContent = 'Kamera açılıyor…';
+    await engine.start();
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
     if (USE_3D) {
-      // WebGL bağlamı kaybı sessizce siyah ekrana yol açar — yakala ve söyle.
-      threeCanvas.addEventListener('webglcontextlost', (e) => {
-        e.preventDefault();
-        showFatal('WebGL bağlamı kaybedildi', new Error('webglcontextlost'));
-      });
-
-      scene = new TryOnScene(threeCanvas, {
-        // Tesselation modelin kendi sabitinden geliyor — 852 üçgenlik indeks
-        // dizisini repoya gömmeye gerek yok.
-        tesselation: FaceLandmarker.FACE_LANDMARKS_TESSELATION,
-        maxPixelRatio: capability.budget.maxPixelRatio,
-      });
-      scene.resize(video.videoWidth, video.videoHeight);
-      applySceneControls();
+      // Video artık WebGL sahnesinin arka planı — HTML video gizli kalıyor.
+      video.classList.remove('live');
     } else {
       threeCanvas.hidden = true;
+      video.classList.add('live');
     }
 
-    video.classList.add('live');
+    const hairToggle = el<HTMLInputElement>('show-hair');
+    hairToggle.disabled = !engine.hairAvailable;
+    if (!engine.hairAvailable) hairToggle.checked = false;
+
+    applySceneControls();
     el('gate').hidden = true;
     panel.hidden = false;
     renderPriorTable();
     renderAudit();
-    requestAnimationFrame(loop);
+    renderFit(el('fit'), null);
   } catch (error) {
-    releaseCamera();
     button.disabled = false;
     button.textContent = 'Tekrar Dene';
-    fail(cameraErrorMessage(error));
+    fail(error instanceof Error ? error.message : String(error));
   }
 }
 
-// ---------------------------------------------------------------- döngü
+// ---------------------------------------------------------------- kare olayı
 
-let lastVideoTime = -1;
-let frameCount = 0;
-let fpsWindowStart = performance.now();
-let displayFps = 0;
-let inferenceMs = 0;
+function onFrame(f: EngineFrame): void {
+  const t = f.timings;
+  el('fps').textContent = `${displayFilters.fps.filter(t.fps, f.timestampMs).toFixed(0)} FPS · ${t.inferenceMs.toFixed(1)} ms`;
+  el('timings').textContent =
+    `saç ${t.hairMs.toFixed(1)} · çöz ${t.solveMs.toFixed(1)} · çiz ${t.renderMs.toFixed(1)} ms`;
 
-function loop(): void {
-  if (loopStopped) return;
-  requestAnimationFrame(loop);
-  try {
-    tick();
-  } catch (error) {
-    // Tek bir hatayı 60 Hz tekrarlamak yerine dur ve göster.
-    showFatal('render döngüsü', error);
-  }
-}
-
-function tick(): void {
-  if (!landmarker || video.readyState < 2) return;
-
-  const now = performance.now();
-  if (video.currentTime === lastVideoTime) return;
-  lastVideoTime = video.currentTime;
-
-  const t0 = performance.now();
-  const result = landmarker.detectForVideo(video, now);
-  inferenceMs = performance.now() - t0;
-
-  frameCount++;
-  if (now - fpsWindowStart >= 500) {
-    const raw = (frameCount * 1000) / (now - fpsWindowStart);
-    displayFps = displayFilters.fps.filter(raw, now);
-    frameCount = 0;
-    fpsWindowStart = now;
-    el('fps').textContent = `${displayFps.toFixed(0)} FPS · ${inferenceMs.toFixed(1)} ms`;
-  }
-
-  const raw = result.faceLandmarks[0];
-  if (!raw || raw.length === 0) {
+  if (!f.units || !f.metric) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    scene?.hide();
-    scene?.render();
     setGateStatus('bad', 'Yüz bulunamadı');
     return;
   }
-  // İris yoksa ölçek füzyonu çalışamaz — ama bu döngüyü öldürmemeli.
-  // (Eskiden burada throw vardı; her karede atılıp sekmeyi kilitliyordu.)
-  if (raw.length < EXPECTED_LANDMARK_COUNT) {
-    setGateStatus('bad', `İris landmarkları yok (${raw.length}/${EXPECTED_LANDMARK_COUNT}) — model paketi hatalı`);
-    return;
-  }
 
-  const aspect = canvas.width / canvas.height;
-  const units = toFaceUnits(raw, aspect);
-  const frame = estimator.update(units);
-
-  if (scene && frame) {
-    const k = smoothScale(frame.scale.scale, now);
-    // NaN/sonsuz ölçek geometriyi bozar ve three.js her karede uyarı basar.
-    if (Number.isFinite(k) && k > 0) {
-      scene.update(units, k, aspect);
-      scene.render();
-    } else {
-      scene.hide();
-      scene.render();
-    }
-  }
-
-  drawOverlay(ctx, units, frame?.geometry ?? null, aspect, readFlags());
-  if (frame) updatePanel(frame, now);
-}
-
-/**
- * Sahne ölçeğini ayrıca yumuşat.
- *
- * Ölçek kare kare oynarsa gözlük nefes alıyormuş gibi büyüyüp küçülür — bu,
- * poz titremesinden çok daha rahatsız edici. Ölçek fiziksel olarak sabit bir
- * büyüklük (kişinin yüzü değişmiyor), o yüzden agresif filtrelenebilir.
- */
-const scaleFilter = new OneEuroFilter({ minCutoff: 0.25, beta: 0.002 });
-function smoothScale(value: number, now: number): number {
-  return scaleFilter.filter(value, now);
+  drawOverlay(ctx, f.units, f.metric.geometry, f.aspect, readFlags());
+  updatePanel(f.metric, f.timestampMs);
+  updateSceneInfo();
 }
 
 // ---------------------------------------------------------------- panel
@@ -418,14 +281,33 @@ function updatePanel(frame: EstimatorFrame, now: number): void {
     ]),
   );
 
-  updateSceneInfo();
-
   el('fusion-note').innerHTML =
     frame.scale.method === 'gls'
       ? 'GLS füzyonu — ipuçları arası korelasyon hesaba katıldı. İki iris ölçümü ' +
         'aynı büyüklüğün iki gözlemi olduğu için güven yapay olarak şişmiyor.'
       : '<span class="q-warn">Fallback: ters-varyans + tasarım etkisi cezası.</span> ' +
         'GLS güvenlik kapısına takıldı — kovaryans matrisi kötü koşullanmış olabilir.';
+}
+
+function updateSceneInfo(): void {
+  const scene = engine?.scene;
+  if (!scene) return;
+  const p = scene.lastPlacement;
+  const solve = scene.lastSolve;
+  const local = scene.local;
+
+  el('scene-info').innerHTML = rows([
+    ['Çerçeve', specLabel(scene.spec)],
+    ['Kamera mesafesi', `${fmt(p.distanceMM / 10, 1)} cm`],
+    [
+      'Yerleşim',
+      p.mode === 'solver' ? 'temas çözücüsü' : p.mode === 'naive' ? '<span class="q-warn">yedek (naif)</span>' : '—',
+    ],
+    ['Dinlenme', solve ? STATUS_LABEL[solve.status] : '—'],
+    ['Belirleyen temas', solve ? CONSTRAINT_LABEL[solve.governing] : '—'],
+    ['Ped yüksekliği', local ? `${fmt(local.pivotY, 1)} mm <small>(sellion'a göre)</small>` : '—'],
+    ['Pantoskopik', local ? `${fmt(local.pitchDeg, 1)}°` : '—'],
+  ]);
 }
 
 function setGateStatus(kind: 'ok' | 'warn' | 'bad', text: string): void {
@@ -449,12 +331,58 @@ function fmt(v: number, digits: number): string {
 }
 
 function renderPriorTable(): void {
-  // Prior'ların ne olduğu görünür olsun — bunlar Gün 5'te kalibre edilecek
-  // TAHMİNLER, ve hangi sayının nereden geldiği unutulmamalı.
-  const note = el('fusion-note');
-  note.title = Object.values(PRIORS)
+  // Prior'lar görünür olsun — bunlar T-00'da kalibre edilecek TAHMİNLER.
+  el('fusion-note').title = Object.values(PRIORS)
     .map((p) => `${p.label}: ${p.muMM} ± ${p.sigmaMM} mm — ${p.source}`)
     .join('\n');
+}
+
+// ---------------------------------------------------------------- sahne kontrolleri
+
+function applySceneControls(rebuildParametric = true): void {
+  const scene = engine?.scene;
+  if (!engine || !scene) return;
+
+  if (rebuildParametric && modelChoice === 'parametric') {
+    const [w, b, t] = el<HTMLSelectElement>('frame-size').value.split(',').map(Number);
+    engine.setFrameSize(w!, b!, t!);
+  }
+
+  scene.setGlassesVisible(el<HTMLInputElement>('show-glasses').checked);
+  scene.setOccluderDebug(el<HTMLSelectElement>('occluder-debug').value as OccluderDebug);
+  scene.setAnchorsVisible(el<HTMLInputElement>('show-anchors').checked);
+  scene.setShadowsVisible(el<HTMLInputElement>('show-shadows').checked);
+  engine.setHairEnabled(el<HTMLInputElement>('show-hair').checked);
+}
+
+const glb = setupGlbLoader({
+  getEngine: () => engine,
+  onLoaded: (source) => {
+    if (source === 'file') {
+      modelChoice = 'custom';
+      const option = el<HTMLOptionElement>('model-custom');
+      option.hidden = false;
+      el<HTMLSelectElement>('glasses-model').value = 'custom';
+      el('attribution').hidden = true;
+    }
+    el<HTMLSelectElement>('frame-size').disabled = modelChoice !== 'parametric';
+    applySceneControls(false);
+  },
+});
+
+async function chooseModel(choice: string): Promise<void> {
+  if (!engine) return;
+  if (choice === 'khronos') {
+    modelChoice = 'khronos';
+    el('attribution').hidden = false;
+    await glb.load(DEMO_MODEL_URL, 'khronos-sunglasses.glb');
+  } else if (choice === 'parametric') {
+    modelChoice = 'parametric';
+    el('attribution').hidden = true;
+    glb.clearInfo();
+    applySceneControls(true);
+  }
+  el<HTMLSelectElement>('frame-size').disabled = modelChoice !== 'parametric';
 }
 
 // ---------------------------------------------------------------- çalışma kaydı
@@ -484,34 +412,6 @@ function record(): void {
   }
 }
 
-// ---------------------------------------------------------------- sahne kontrolleri
-
-/** GLB yüklüyken ölçü seçici parametrik modeli geri getirmemeli. */
-let usingLoadedFrame = false;
-
-function applySceneControls(rebuildParametric = true): void {
-  if (!scene) return;
-
-  if (rebuildParametric && !usingLoadedFrame) {
-    const [w, b, t] = el<HTMLSelectElement>('frame-size').value.split(',').map(Number);
-    scene.setFrameSpec({ ...scene.spec, lensWidth: w!, bridgeWidth: b!, templeLength: t! });
-  }
-
-  scene.setGlassesVisible(el<HTMLInputElement>('show-glasses').checked);
-  scene.setOccluderDebug(el<HTMLSelectElement>('occluder-debug').value as OccluderDebug);
-  scene.setAnchorsVisible(el<HTMLInputElement>('show-anchors').checked);
-}
-
-function updateSceneInfo(): void {
-  if (!scene) return;
-  const p = scene.lastPlacement;
-  el('scene-info').innerHTML = rows([
-    ['Çerçeve', specLabel(scene.spec)],
-    ['Kamera mesafesi', `${fmt(p.distanceMM / 10, 1)} cm`],
-    ['Toplam genişlik', `${scene.spec.lensWidth * 2 + scene.spec.bridgeWidth} mm`],
-  ]);
-}
-
 // ---------------------------------------------------------------- denetim
 
 function renderAudit(): void {
@@ -521,27 +421,20 @@ function renderAudit(): void {
 
   el('audit-progress').textContent = auditActive
     ? `${current}/${total} · ${verdict === 'ok' ? '✓' : verdict === 'suspect' ? '✗' : '—'}`
-    : summaryLabel();
+    : `${audit.summary().ok}/${total} doğrulandı`;
 
   el('audit-title').textContent = `${current}. ${step.title}`;
   el('audit-check').textContent = step.check;
   el('audit-impact').textContent = step.impact;
 
   const s = audit.summary();
-  const node = el('audit-summary');
-  node.innerHTML = s.pending === total
-    ? 'Henüz denetim yapılmadı. Ölçüm sayıları bu adım tamamlanmadan güvenilir sayılmamalı.'
-    : s.complete
-      ? '<span class="q-ok">Tüm gruplar doğrulandı.</span> landmarkIndices.ts içindeki <code>verified</code> alanları true yapılabilir.'
-      : `<span class="${s.suspect > 0 ? 'q-bad' : 'q-warn'}">${s.ok} doğru · ${s.suspect} şüpheli · ${s.pending} bekliyor</span>`;
+  el('audit-summary').innerHTML =
+    s.pending === total
+      ? 'Henüz denetim yapılmadı.'
+      : s.complete
+        ? '<span class="q-ok">Tüm gruplar doğrulandı.</span>'
+        : `<span class="${s.suspect > 0 ? 'q-bad' : 'q-warn'}">${s.ok} doğru · ${s.suspect} şüpheli · ${s.pending} bekliyor</span>`;
 }
-
-function summaryLabel(): string {
-  const s = audit.summary();
-  return `${s.ok}/${AUDIT_TOTAL} doğrulandı`;
-}
-
-const AUDIT_TOTAL = audit.position.total;
 
 function setAuditActive(active: boolean): void {
   auditActive = active;
@@ -577,16 +470,17 @@ el('audit-suspect').addEventListener('click', () => {
   audit.next();
   renderAudit();
 });
-for (const id of ['show-glasses', 'occluder-debug', 'frame-size', 'show-anchors']) {
-  el(id).addEventListener('change', () => applySceneControls());
-}
+el('audit-report').addEventListener('click', () => alert(audit.report()));
+el('audit-reset').addEventListener('click', () => {
+  audit.reset();
+  renderAudit();
+});
 
-setupGlbLoader({
-  getScene: () => scene,
-  onLoaded: () => {
-    usingLoadedFrame = !el('glb-controls').hidden;
-    applySceneControls(false);
-  },
+for (const id of ['show-glasses', 'occluder-debug', 'frame-size', 'show-anchors', 'show-shadows', 'show-hair']) {
+  el(id).addEventListener('change', () => applySceneControls(id === 'frame-size'));
+}
+el('glasses-model').addEventListener('change', () => {
+  void chooseModel(el<HTMLSelectElement>('glasses-model').value);
 });
 
 el('fatal-copy').addEventListener('click', () => {
@@ -594,17 +488,12 @@ el('fatal-copy').addEventListener('click', () => {
 });
 el('fatal-reload').addEventListener('click', () => location.reload());
 
-el('audit-report').addEventListener('click', () => alert(audit.report()));
-el('audit-reset').addEventListener('click', () => {
-  audit.reset();
-  renderAudit();
-});
-
-// Ölçek kilitli kaldığında yeni denek için sıfırlama gerekir.
+// Yeni denek: ölçüm, ölçek ve fit geçmişi sıfırlanmalı.
 el('subject').addEventListener('change', () => {
-  estimator = new MetricEstimator();
+  engine?.resetMeasurements();
   displayFilters.pd.reset();
   lastState = null;
+  renderFit(el('fit'), null);
 });
 
 void showCapability();

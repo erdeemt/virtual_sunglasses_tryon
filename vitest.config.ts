@@ -6,6 +6,7 @@ export default defineConfig({
     alias: {
       '@vto/core': resolve(import.meta.dirname, 'packages/core/src'),
       '@vto/render': resolve(import.meta.dirname, 'packages/render/src'),
+      '@vto/engine': resolve(import.meta.dirname, 'packages/engine/src'),
     },
   },
   test: {

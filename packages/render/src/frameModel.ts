@@ -78,6 +78,12 @@ export interface BuiltFrame {
   group: THREE.Group;
   anchors: FrameAnchors;
   spec: FrameSpec;
+  /** Toplam ön genişlik (mm). Verilmezse spec'ten hesaplanır. */
+  frontWidth?: number;
+  /** Lens arka yüzünün lens merkez düzleminin gerisinde kaldığı mesafe (mm). */
+  lensBackOffset?: number;
+  /** Yüz formu açısı (°); ölçülmediyse null. */
+  frameWrapDeg?: number | null;
   /** Malzeme referansları — renk/varyant değişimi için. */
   materials: { frame: THREE.MeshPhysicalMaterial; lens: THREE.MeshPhysicalMaterial };
   dispose(): void;
@@ -206,11 +212,17 @@ export function buildFrame(spec: FrameSpec = DEFAULT_SPEC): BuiltFrame {
 
   // --- anchor noktaları ---------------------------------------------------
   const bridgeTopY = spec.lensHeight / 2 - spec.rimThickness + spec.lensHeight * 0.12;
+  // Köprü anchor'ı kemerin ALT yüzü — burun sırtına en yakın nokta. Çözücü
+  // bunu sırtın üstünde boşluk bırakacak şekilde kullanıyor.
+  const bridgeUnderY = bridgeTopY - spec.rimThickness * 0.9;
   const anchors: FrameAnchors = {
-    bridgeCenter: new THREE.Vector3(0, bridgeTopY, -spec.rimDepth / 2),
-    // Burun pedleri köprünün biraz altında ve içeride, yüze doğru.
-    nosePadL: new THREE.Vector3(halfBridge * 0.55, bridgeTopY - 6, -spec.rimDepth / 2 - 3),
-    nosePadR: new THREE.Vector3(-halfBridge * 0.55, bridgeTopY - 6, -spec.rimDepth / 2 - 3),
+    bridgeCenter: new THREE.Vector3(0, bridgeUnderY, -spec.rimDepth / 2),
+    // Burun pedleri: gerçek metal çerçevelerde ped yüzeyi lens kutusu
+    // merkezinin biraz üstünde ve ped kolları sayesinde lens düzleminin
+    // ~5 mm gerisindedir. (Önceki değer merkezin 15 mm üstündeydi — çözücü
+    // testleri bunun çerçeveyi gözün çok altına ittiğini gösterdi.)
+    nosePadL: new THREE.Vector3(halfBridge * 0.75, 2, -spec.rimDepth / 2 - 5),
+    nosePadR: new THREE.Vector3(-halfBridge * 0.75, 2, -spec.rimDepth / 2 - 5),
     hingeL: new THREE.Vector3(hingeX, hingeY, 0),
     hingeR: new THREE.Vector3(-hingeX, hingeY, 0),
     // Sap ucu değil, kulak üstüne DEĞDİĞİ nokta — kıvrımın başladığı yer.

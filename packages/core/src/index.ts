@@ -43,3 +43,28 @@ export { extractFrameGeometry, monocularPD, cueValue, type FrameGeometry } from 
 export { MetricEstimator, type EstimatorFrame, type EstimatorOptions } from './metric/estimator.js';
 export { median, robustSigma, invert } from './metric/linalg.js';
 export { OneEuroFilter, OneEuroVector, type OneEuroOptions } from './filter/oneEuro.js';
+
+export { buildHeadFrame, toHead, fromHead, type HeadFrame } from './solver/headFrame.js';
+export { HeadSurface, type MeshMM } from './solver/surface.js';
+export {
+  solvePlacement,
+  composePose,
+  modelToHead,
+  padMid,
+  DEFAULT_PLACEMENT,
+  type GlassesGeometry,
+  type PlacementOptions,
+  type PlacementResult,
+  type LocalPose,
+  type WorldPose,
+  type RestStatus,
+  type ConstraintKey,
+} from './solver/placement.js';
+export {
+  computeFit,
+  type FitReport,
+  type FitComponent,
+  type FitKey,
+  type OpticalMeasurements,
+  type Verdict,
+} from './solver/fit.js';

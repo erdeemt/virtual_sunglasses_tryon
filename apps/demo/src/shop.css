@@ -1,0 +1,240 @@
+:root {
+  --ink: #16181d;
+  --muted: #6b7280;
+  --line: #e7e5e0;
+  --paper: #faf9f6;
+  --card: #ffffff;
+  --accent: #1a73e8;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+.shop-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px clamp(16px, 4vw, 48px);
+  background: rgba(250, 249, 246, 0.9);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.logo {
+  letter-spacing: 0.12em;
+  font-size: 15px;
+}
+
+.logo span {
+  color: var(--accent);
+}
+
+.shop-header nav {
+  display: flex;
+  gap: 20px;
+  font-size: 14px;
+}
+
+.shop-header nav a {
+  text-decoration: none;
+  color: var(--muted);
+}
+
+.shop-header nav a:hover {
+  color: var(--ink);
+}
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 clamp(16px, 4vw, 48px) 64px;
+}
+
+.hero {
+  padding: 56px 0 36px;
+  max-width: 680px;
+}
+
+.hero h1 {
+  font-size: clamp(30px, 5vw, 46px);
+  line-height: 1.1;
+  margin: 0 0 14px;
+  letter-spacing: -0.02em;
+}
+
+.hero p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 17px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.product {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.product glasses-tryon {
+  justify-self: start;
+}
+
+.meta h2 {
+  font-size: 16px;
+  margin: 0 0 2px;
+}
+
+.size {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.price {
+  margin: 6px 0 0;
+  font-weight: 700;
+}
+
+/* Ürün görseli yerine CSS ile çizilmiş basit gözlük silueti — demo sayfası
+   üçüncü taraf ürün fotoğrafı kullanmıyor. */
+.shot {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #f2f0eb, #e9e6df);
+  overflow: hidden;
+}
+
+.shot::before,
+.shot::after {
+  content: '';
+  position: absolute;
+  top: 38%;
+  width: 30%;
+  height: 26%;
+  border: 5px solid #23262d;
+  border-radius: 40% 40% 46% 46%;
+}
+
+.shot::before {
+  left: 17%;
+}
+
+.shot::after {
+  right: 17%;
+}
+
+.shot.sun::before,
+.shot.sun::after {
+  background: linear-gradient(160deg, #3b3f47, #0f1115 70%, #3a5a70);
+  border-color: #c9ccd1;
+  border-width: 3px;
+  border-radius: 38% 38% 52% 52%;
+  height: 32%;
+}
+
+.shot.wide::before,
+.shot.wide::after {
+  width: 34%;
+}
+
+.shot.wide::before {
+  left: 13%;
+}
+
+.shot.wide::after {
+  right: 13%;
+}
+
+.shot.narrow::before,
+.shot.narrow::after {
+  width: 26%;
+}
+
+.shot.narrow::before {
+  left: 21%;
+}
+
+.shot.narrow::after {
+  right: 21%;
+}
+
+.panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin-top: 56px;
+  padding: 28px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+@media (max-width: 820px) {
+  .panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel h2 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+
+.panel h2 small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+pre {
+  margin: 12px 0;
+  padding: 14px;
+  background: #16181d;
+  color: #e6eaef;
+  border-radius: 10px;
+  font: 12.5px/1.55 ui-monospace, Consolas, monospace;
+  overflow-x: auto;
+}
+
+.log {
+  max-height: 340px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.shop-footer {
+  padding: 24px clamp(16px, 4vw, 48px);
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}

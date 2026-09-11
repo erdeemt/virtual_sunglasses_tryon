@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@vto/core": ["../core/src/index.ts"],
+      "@vto/render": ["../render/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

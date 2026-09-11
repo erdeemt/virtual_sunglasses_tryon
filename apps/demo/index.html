@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>VTO Çekirdek — Metrik Ölçek Doğrulama</title>
+    <title>VTO — Geliştirme Paneli</title>
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
@@ -12,9 +12,9 @@
         <h2>Hata yakalandı</h2>
         <pre id="fatal-message"></pre>
         <p class="note">
-          Teşhis anahtarları: <code>?no3d=1</code> 3D sahneyi kapatır ·
-          <code>?cpu=1</code> MediaPipe'ı CPU'ya alır · <code>?no3d=1&amp;cpu=1</code> ikisi birden.
-          Hangisiyle çökme durursa sorun oradadır.
+          Teşhis anahtarları: <code>?no3d=1</code> 3D sahneyi kapatır · <code>?cpu=1</code> MediaPipe'ı
+          CPU'ya alır · <code>?nohair=1</code> saç segmentasyonunu kapatır. Hangisiyle sorun
+          kaybolursa suçlu odur.
         </p>
         <button id="fatal-copy" type="button">Hatayı Kopyala</button>
         <button id="fatal-reload" type="button">Yeniden Yükle</button>
@@ -28,14 +28,15 @@
 
       <div id="gate" class="gate">
         <div class="gate-card">
-          <h1>Metrik Ölçek Doğrulama</h1>
+          <h1>VTO Geliştirme Paneli</h1>
           <p>
-            Bu araç kameranı kullanarak yüz ölçülerini milimetre cinsinden tahmin eder.
-            <strong>Görüntü cihazından çıkmaz</strong> — tüm işlem tarayıcıda yapılır, hiçbir kare
-            sunucuya gönderilmez.
+            Kameranı kullanarak yüz ölçülerini milimetre cinsinden tahmin eder ve gözlüğü gerçek
+            fiziksel ölçüleriyle yerleştirir. <strong>Görüntü cihazından çıkmaz</strong> — tüm işlem
+            tarayıcıda yapılır, hiçbir kare sunucuya gönderilmez.
           </p>
           <div id="capability" class="cap"></div>
           <button id="start" type="button">Kamerayı Başlat</button>
+          <a class="gate-link" href="/shop.html">Demo mağazayı aç →</a>
           <p id="gate-error" class="err" hidden></p>
         </div>
       </div>
@@ -45,8 +46,15 @@
       <header>
         <span id="fps" class="pill">— FPS</span>
         <span id="tier" class="pill">—</span>
+        <a class="pill link" href="/shop.html">mağaza</a>
         <button id="toggle-panel" type="button" title="Paneli daralt">▾</button>
       </header>
+      <div id="timings" class="timings mono">—</div>
+
+      <section>
+        <h2>Fit &amp; Optik Ölçüm</h2>
+        <div id="fit"></div>
+      </section>
 
       <section id="pose-section">
         <h2>Poz &amp; Ölçüm Kapısı</h2>
@@ -56,17 +64,15 @@
       </section>
 
       <section>
-        <h2>3D Sahne <small>(Gün 8–9)</small></h2>
-        <label><input type="checkbox" id="show-glasses" checked /> Gözlüğü göster</label>
+        <h2>Gözlük &amp; Sahne</h2>
         <label>
-          Occluder
-          <select id="occluder-debug">
-            <option value="off">gizli (normal occlusion)</option>
-            <option value="wireframe">wireframe</option>
-            <option value="solid">dolu</option>
+          Model
+          <select id="glasses-model">
+            <option value="parametric" selected>Parametrik (ölçü seç)</option>
+            <option value="khronos">Güneş gözlüğü — Khronos (GLB)</option>
+            <option value="custom" id="model-custom" hidden>Yüklenen dosya</option>
           </select>
         </label>
-        <label><input type="checkbox" id="show-anchors" /> Anchor noktalarını göster</label>
         <label>
           Çerçeve ölçüsü
           <select id="frame-size">
@@ -75,11 +81,27 @@
             <option value="54,20,150">54□20-150 (geniş)</option>
           </select>
         </label>
-        <table id="scene-info"></table>
-        <p class="note">
-          Gözlük gerçek fiziksel ölçüleriyle yerleştiriliyor. Ölçek tahmini yanlışsa çerçeve
-          orantısız durur — metrik doğruluk artık görülebilir.
+        <p id="attribution" class="note attribution" hidden>
+          Model: "SunglassesKhronos" — Eric Chadwick, Darmstadt Graphics Group,
+          <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY-4.0</a>.
+          Khronos logoları içerir; yalnızca demo amaçlı.
         </p>
+
+        <div class="toggles">
+          <label><input type="checkbox" id="show-glasses" checked /> Gözlük</label>
+          <label><input type="checkbox" id="show-shadows" checked /> Gölgeler</label>
+          <label><input type="checkbox" id="show-hair" checked /> Saç occlusion</label>
+          <label><input type="checkbox" id="show-anchors" /> Anchor'lar</label>
+        </div>
+        <label>
+          Occluder
+          <select id="occluder-debug">
+            <option value="off">gizli (normal occlusion)</option>
+            <option value="wireframe">wireframe</option>
+            <option value="solid">dolu</option>
+          </select>
+        </label>
+        <table id="scene-info"></table>
       </section>
 
       <section>
@@ -91,6 +113,14 @@
           <input type="file" id="glb-input" accept=".glb,.gltf" hidden />
         </div>
 
+        <label>
+          Ölçek
+          <select id="glb-scale">
+            <option value="auto" selected>otomatik (glTF metre, uymazsa genişlik)</option>
+            <option value="meters">glTF metre (×1000)</option>
+            <option value="fit-width">gerçek ön genişliğe oturt</option>
+          </select>
+        </label>
         <label>
           Gerçek ön genişlik (mm)
           <input type="number" id="front-width" value="138" min="80" max="200" step="1" />
@@ -108,13 +138,12 @@
           </label>
           <label><input type="checkbox" id="glb-flip" /> Saplar ters yönde (180° çevir)</label>
           <button id="glb-reload" type="button">Yeniden Yükle</button>
-          <button id="glb-clear" type="button">Parametrik Modele Dön</button>
         </div>
 
         <div id="glb-info" class="mono"></div>
         <p class="note">
-          Anchor'lar geometriden türetiliyor (köprü, menteşe, sap ucu). "Anchor noktalarını
-          göster" ile doğru yerde olduklarını kontrol et — yerleştirme çözücüsü bunlara güvenecek.
+          Parçaları isimli modellerde (Nosepads, Temple, Lens…) anchor'lar gerçek geometriden,
+          diğerlerinde heuristikle çıkar. "Anchor'lar" ile kontrol et.
         </p>
       </section>
 
@@ -130,7 +159,7 @@
       </section>
 
       <section>
-        <h2>Landmark Denetimi <small>(Gün 3 kapısı)</small></h2>
+        <h2>Landmark Denetimi</h2>
 
         <button id="audit-toggle" type="button">Denetimi Başlat</button>
         <div id="audit-progress" class="pill" style="margin-left: 8px">—</div>
@@ -158,12 +187,12 @@
 
         <hr />
         <label><input type="checkbox" id="show-all" /> 478 noktanın tümü</label>
-        <label><input type="checkbox" id="show-named" checked /> Adlandırılmış noktalar + etiket</label>
-        <label><input type="checkbox" id="show-plane" checked /> Simetri düzlemi &amp; eksenler</label>
+        <label><input type="checkbox" id="show-named" /> Adlandırılmış noktalar + etiket</label>
+        <label><input type="checkbox" id="show-plane" /> Simetri düzlemi &amp; eksenler</label>
       </section>
 
       <section>
-        <h2>Doğruluk Çalışması <small>(Gün 5 kapısı)</small></h2>
+        <h2>Doğruluk Çalışması <small>(T-00)</small></h2>
         <label>Denek kodu <input type="text" id="subject" placeholder="S01" /></label>
         <label>Gerçek PD (mm) <input type="number" id="truth-pd" step="0.5" placeholder="63.0" /></label>
         <button id="record" type="button">Ölçümü Kaydet</button>
