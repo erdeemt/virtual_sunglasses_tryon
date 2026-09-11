@@ -94,7 +94,15 @@ export class TryOnScene {
     distanceMM: number;
     visible: boolean;
     mode: 'solver' | 'naive' | 'none';
-  } = { distanceMM: NaN, visible: false, mode: 'none' };
+  } = {
+    distanceMM: NaN,
+    // Varsayılan GÖRÜNÜR. Eskiden false'tu ve yalnızca geliştirme panelinin
+    // "Gözlük" kutucuğu setGlassesVisible(true) çağırıyordu — embed widget
+    // çağırmadığı için mağazada kamera açılıyor ama gözlük hiç görünmüyordu.
+    // Gizlemek bir teşhis seçeneği; ürünün varsayılanı olamaz.
+    visible: true,
+    mode: 'none',
+  };
   timings = { solveMs: 0 };
 
   constructor(canvas: HTMLCanvasElement, options: SceneOptions) {
